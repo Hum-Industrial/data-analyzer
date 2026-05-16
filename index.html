@@ -834,6 +834,7 @@ const STATE_COLORS = { currently_parked:"#76B7B2", currently_moving:"#4E79A7",
   was_parked_now_moving:"#F28E2B", was_moving_now_parked:"#E15759" };
 const PALETTE = ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F","#EDC948",
   "#B07AA1","#FF9DA7","#9C755F","#6E9BD1","#D1A44E","#499894"];
+const DEFAULT_FROM_DATE = "2026-01-01";
 
 // ---------- App state ----------
 const state = {
@@ -922,6 +923,7 @@ function updateDropdownCounts() {
 }
 
 // ---------- Entry ----------
+document.getElementById("fromDate").value = DEFAULT_FROM_DATE;
 document.getElementById("readmeOkBtn").addEventListener("click", () => {
   document.getElementById("readmeScreen").classList.add("hidden");
   if (state.rows.length) {
@@ -936,7 +938,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   state.tz = "Asia/Kolkata";
   document.getElementById("tzSelect").value = state.tz;
   if (state.tsMin && state.tsMax) {
-    setDateInputFromUtc("fromDate", state.tsMin, state.tz);
+    document.getElementById("fromDate").value = DEFAULT_FROM_DATE;
     setDateInputFromUtc("toDate", state.tsMax, state.tz);
     state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
     state.toUtc   = parseDateInputToUtc("toDate",   state.tz, true);
@@ -1226,10 +1228,10 @@ function ingest(matrix) {
   } else {
     state.tsMin = state.tsMax = null;
   }
-  // Default TZ + date inputs + window from the uploaded file.
+  // Default TZ + date inputs. Start at the reporting baseline, end at the uploaded file max.
   state.tz = document.getElementById("tzSelect").value || "Asia/Kolkata";
   if (state.tsMin && state.tsMax) {
-    setDateInputFromUtc("fromDate", state.tsMin, state.tz);
+    document.getElementById("fromDate").value = DEFAULT_FROM_DATE;
     setDateInputFromUtc("toDate", state.tsMax, state.tz);
     state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
     state.toUtc   = parseDateInputToUtc("toDate",   state.tz, true);
