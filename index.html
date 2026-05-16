@@ -1,0 +1,3469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Gateway Report — Boomerang Sensor Analyzer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Cache-Control" content="no-store" />
+<link rel="stylesheet" href="leaflet.css" />
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --panel2: #f0f2f5;
+    --ink: #1a202c;
+    --ink-dim: #64748b;
+    --accent: #2563eb;
+    --accent-2: #0f766e;
+    --warn: #c2410c;
+    --bad: #b91c1c;
+    --line: #e2e8f0;
+    --grid: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
+    flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+  header .spacer { flex: 1; }
+  .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .header-controls .hc-group { display: flex; align-items: center; gap: 6px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+  .header-controls input[type=date], .header-controls select {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 8px; font-size: 13px; font-family: inherit;
+    color-scheme: light; }
+  .header-controls input[type=date]:focus, .header-controls select:focus {
+    outline: none; border-color: var(--accent); }
+  .header-controls select { max-width: 220px; }
+  .dropdown { position: relative; }
+  .dropdown-btn { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .dropdown-btn:hover { border-color: var(--accent); }
+  .dropdown-btn .dd-count { background: var(--accent); color: #fff; border-radius: 99px;
+    padding: 1px 7px; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .dropdown-btn .caret { color: var(--ink-dim); font-size: 10px; }
+  .dropdown-panel { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    min-width: 240px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10); text-transform: none;
+    letter-spacing: 0; color: var(--ink); }
+  .dropdown.open .dropdown-panel { display: block; }
+  .dropdown-panel.wide { min-width: 420px; max-width: min(720px, 92vw); }
+  .dropdown-panel-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--ink-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .wagon-widget { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; margin-top: 16px; display: flex; align-items: center; gap: 14px;
+    cursor: pointer; transition: border-color .12s; }
+  .wagon-widget:hover { border-color: var(--accent); }
+  .wagon-widget .wlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ink-dim); font-weight: 600; white-space: nowrap; }
+  .wagon-widget .wimg { position: relative; width: 180px; flex-shrink: 0; line-height: 0; }
+  .wagon-widget .wimg img { width: 100%; height: auto; display: block; }
+  .wagon-widget .wmap { flex: 1; display: grid; grid-template-rows: repeat(2, auto);
+    grid-auto-flow: column; gap: 2px 14px; font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .wagon-widget .wmap span { color: var(--ink-dim); }
+  .wagon-widget .wmap span.assigned { color: var(--ink); }
+  .wagon-widget .wmap .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+    margin-right: 4px; vertical-align: middle; background: #e5e7eb; }
+  .wagon-widget .link { color: var(--accent); font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .wagon-diagram-wrap { display: grid;
+    grid-template-columns: minmax(180px, 1fr) 180px minmax(180px, 1fr);
+    grid-template-rows: repeat(4, auto);
+    column-gap: 28px; row-gap: 10px;
+    align-items: center; justify-items: stretch;
+    max-width: 900px; margin: 0 auto; }
+  .wagon-diagram-wrap .wagon-page-img { grid-column: 2; grid-row: 1 / -1; }
+  @media (max-width: 820px) {
+    .wagon-diagram-wrap { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .wagon-diagram-wrap .wagon-page-img { grid-column: 1; grid-row: auto;
+      max-width: 220px; margin: 0 auto; }
+    .wagon-diagram-wrap .wagon-slot { grid-column: 1 !important; grid-row: auto !important; }
+  }
+  .wagon-page-img { position: relative; width: 180px; margin: 0 auto; line-height: 0; }
+  .wagon-page-img img { width: 100%; height: auto; display: block; }
+  .wheel-dot { position: absolute; border-radius: 50%; background: rgba(229, 231, 235, 0.55);
+    border: 2px solid #94a3b8; transform: translate(-50%, -50%);
+    transition: background .15s, border-color .15s, box-shadow .15s;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600;
+    color: var(--ink); pointer-events: none; }
+  .wheel-dot.assigned { border-color: var(--ink); border-width: 3px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }
+  .wagon-widget .wheel-dot { width: 10px; height: 10px; border-width: 1.5px; font-size: 0; }
+  .wagon-widget .wheel-dot.assigned { border-width: 2px; }
+  .wagon-page-img .wheel-dot { width: 22px; height: 22px; font-size: 9px; }
+  .gateway-rect { position: absolute; background: var(--accent); border: 2px solid var(--ink);
+    transform: translate(-50%, -50%); border-radius: 4px; pointer-events: auto;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+  .wagon-widget .gateway-rect { width: 14px; height: 9px; border-width: 1.5px; font-size: 0; }
+  .wagon-page-img .gateway-rect { width: 22px; height: 32px; font-size: 9px;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.7); }
+  .wagon-slots { display: flex; flex-direction: column; gap: 10px; }
+  .wagon-slot { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .wagon-slot-label { font-size: 11px; text-transform: uppercase; color: var(--ink-dim);
+    letter-spacing: .08em; font-weight: 600; margin-bottom: 6px; }
+  .wagon-slot select { width: 100%; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color-scheme: light; }
+  .wagon-slot-stat { font-size: 11px; color: var(--ink-dim); margin-top: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .file-label { cursor: pointer; background: var(--accent); color: #ffffff; padding: 8px 14px;
+    border-radius: 8px; font-weight: 600; font-size: 14px; }
+  .file-label input { display: none; }
+  .file-name { color: var(--ink-dim); font-size: 13px; }
+  main { padding: 16px 20px 40px; max-width: 1400px; margin: 0 auto; }
+  .hint { background: var(--panel); border: 1px dashed var(--line); padding: 24px; border-radius: 12px;
+    text-align: center; color: var(--ink-dim); }
+  .hint b { color: var(--ink); }
+
+  .filter-stack { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+  .filter-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; }
+  .filter-panel.sticky { position: sticky; top: 56px; z-index: 10; }
+  .filter-panel .panel-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ink-dim); font-weight: 600; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+  .filter-row-inline { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 12px; align-items: end; }
+  @media (max-width: 820px) { .filter-row-inline { grid-template-columns: 1fr 1fr; } }
+  .filter-row-inline .group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .filter-row-inline label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+  .filter-row-inline input[type=date], .filter-row-inline select { background: var(--panel2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px;
+    font-family: inherit; color-scheme: light; }
+  .filter-row-inline input[type=date]:focus, .filter-row-inline select:focus { outline: none; border-color: var(--accent); }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; text-transform: none;
+    letter-spacing: 0; color: var(--ink); font-size: 13px; cursor: pointer; }
+  .sensor-fields { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column;
+    grid-auto-columns: min-content; gap: 8px; align-items: start; overflow-x: auto; padding-bottom: 2px; }
+  .sensor-field { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px 4px 8px; }
+  .sensor-field .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .sensor-field input { background: transparent; border: none; color: var(--ink); font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; width: 130px; padding: 4px 2px; }
+  .sensor-field input:focus { outline: none; }
+  .sensor-field .rm { background: transparent; border: none; color: var(--ink-dim); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+  .sensor-field .rm:hover { color: var(--bad); background: var(--panel2); }
+  .sensor-field.empty { opacity: .55; }
+  .sensor-add { grid-row: 1 / span 2; align-self: stretch; display: inline-flex;
+    align-items: center; justify-content: center; gap: 6px; background: transparent;
+    border: 1px dashed var(--line); border-radius: 8px; color: var(--ink-dim);
+    padding: 0 14px; font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  .sensor-add:hover { border-color: var(--accent); color: var(--ink); background: var(--panel2); }
+  .btn { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; margin-top: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ink-dim); font-weight: 600; }
+  .card .big { font-size: 22px; font-weight: 700; }
+  .card .sub { color: var(--ink-dim); font-size: 12px; margin-top: 4px; }
+  .card .rowbars { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .rowbar { display: grid; grid-template-columns: 120px 1fr 42px; align-items: center; gap: 8px;
+    font-size: 12px; }
+  .rowbar .bar { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
+  .rowbar .bar > div { height: 100%; background: var(--accent); }
+  .rowbar .num { color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
+
+  section.block { margin-top: 22px; }
+  section.block > h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--ink-dim); margin: 0 0 10px; font-weight: 600; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 980px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .panel h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap.tall { height: 340px; }
+
+  .dup-table-wrap { max-height: 340px; overflow-y: auto; }
+  .dup-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dup-table th, .dup-table td { padding: 8px 12px; text-align: right;
+    border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .dup-table th:first-child, .dup-table td:first-child { text-align: left;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .dup-table th { color: var(--ink-dim); font-weight: 600; text-transform: uppercase;
+    font-size: 10px; letter-spacing: .08em; background: var(--panel);
+    position: sticky; top: 0; z-index: 1; }
+  .dup-table tr:hover td { background: var(--panel2); }
+  .dup-table td.rssi-cell { font-weight: 600; }
+  .dup-table td.rssi-very-weak, .dup-table tr:hover td.rssi-very-weak { color: #991b1b; background: #fee2e2; }
+  .dup-table td.rssi-weak, .dup-table tr:hover td.rssi-weak { color: #9a3412; background: #ffedd5; }
+  .dup-table td.rssi-fair, .dup-table tr:hover td.rssi-fair { color: #854d0e; background: #fef3c7; }
+  .dup-table td.rssi-good, .dup-table tr:hover td.rssi-good { color: #166534; background: #dcfce7; }
+  .dup-table td.rssi-strong, .dup-table tr:hover td.rssi-strong { color: #065f46; background: #ccfbf1; }
+  .rssi-pair { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;
+    white-space: nowrap; }
+  .rssi-token { display: inline-block; min-width: 34px; padding: 2px 5px; border-radius: 4px;
+    text-align: center; font-weight: 600; }
+  .rssi-token.rssi-very-weak { color: #991b1b; background: #fee2e2; }
+  .rssi-token.rssi-weak { color: #9a3412; background: #ffedd5; }
+  .rssi-token.rssi-fair { color: #854d0e; background: #fef3c7; }
+  .rssi-token.rssi-good { color: #166534; background: #dcfce7; }
+  .rssi-token.rssi-strong { color: #065f46; background: #ccfbf1; }
+  .rssi-sep { color: var(--ink-dim); }
+  .timeline-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 10px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-dim); }
+  .legend-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .legend-title { color: var(--ink); font-weight: 600; }
+  .timeline-date-btn { appearance: none; border: 0; background: transparent; color: var(--ink);
+    padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
+  .timeline-date-btn::before { content: "▸"; display: inline-block; width: 26px; color: var(--ink-dim);
+    font-size: 26px; line-height: 0.7; vertical-align: -5px; }
+  .timeline-date-btn.open::before { content: "▾"; }
+  .timeline-summary-row { cursor: pointer; }
+  .timeline-detail-row { display: none; }
+  .timeline-detail-row.open { display: table-row; }
+  .timeline-detail-cell { background: #f8fafc; padding: 10px 12px !important; }
+  .timeline-detail-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .timeline-detail-table { margin: 0; font-size: 12px; }
+  #unassignedTableWrap { max-height: 520px; overflow: auto; }
+  .unassigned-table { min-width: 1060px; table-layout: fixed; }
+  .unassigned-table th, .unassigned-table td { white-space: nowrap; padding: 7px 10px; }
+  .unassigned-table th:nth-child(1), .unassigned-table td:nth-child(1) { width: 150px; }
+  .unassigned-table th:nth-child(5), .unassigned-table td:nth-child(5) { width: 130px; }
+  .unassigned-table th:nth-child(6), .unassigned-table td:nth-child(6),
+  .unassigned-table th:nth-child(7), .unassigned-table td:nth-child(7) { width: 130px; }
+  .date-stack { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.15; }
+  .date-stack .time { color: var(--ink-dim); }
+  .unassigned-summary-row { cursor: pointer; }
+  .unassigned-sensor-btn { appearance: none; border: 0; background: transparent; color: var(--ink);
+    padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
+  .unassigned-sensor-btn::before { content: "▸"; display: inline-block; width: 22px; color: var(--ink-dim);
+    font-size: 22px; line-height: 0.7; vertical-align: -4px; }
+  .unassigned-sensor-btn.open::before { content: "▾"; }
+  .unassigned-detail-row { display: none; }
+  .unassigned-detail-row.open { display: table-row; }
+  .unassigned-detail-cell { background: #f8fafc; padding: 10px 12px !important; }
+  .unassigned-detail-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .unassigned-detail-table { min-width: 1320px; margin: 0; font-size: 12px; }
+  .unassigned-detail-table th, .unassigned-detail-table td { white-space: nowrap; }
+  .voltage-triplet { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;
+    white-space: nowrap; }
+  .voltage-token { display: inline-block; min-width: 38px; padding: 2px 5px; border-radius: 4px;
+    text-align: center; font-weight: 600; }
+  .voltage-critical { color: #991b1b; background: #fee2e2; }
+  .voltage-low { color: #9a3412; background: #ffedd5; }
+  .voltage-ok { color: #166534; background: #dcfce7; }
+  .voltage-high { color: #065f46; background: #ccfbf1; }
+  .voltage-missing { color: var(--ink-dim); background: var(--panel2); }
+  .dup-table tfoot td { font-weight: 600; border-top: 1px solid var(--line); border-bottom: none; }
+  .dup-table.compact th, .dup-table.compact td { padding: 6px 8px; }
+  .dup-table.compact td { vertical-align: top; }
+  .dup-table.compact th:nth-child(3), .dup-table.compact td:nth-child(3) {
+    min-width: 150px; white-space: normal; word-break: break-word;
+  }
+  .rssi-extremes { display: flex; flex-direction: column; gap: 14px; }
+  .rssi-extreme-table { overflow-x: auto; }
+  .connectivity-main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+  .connectivity-stack { display: flex; flex-direction: column; gap: 12px; }
+  @media (max-width: 980px) { .connectivity-main { grid-template-columns: 1fr; } }
+  .map-link { color: var(--accent); text-decoration: none; }
+  .map-link:hover { text-decoration: underline; }
+  .tabs-bar { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line);
+    margin: -2px 0 12px; padding-bottom: 6px; }
+  .tab { background: transparent; color: var(--ink-dim); border: 1px solid transparent;
+    border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+    white-space: nowrap; }
+  .tab:hover { color: var(--ink); background: var(--panel2); }
+  .tab.active { background: var(--panel2); color: var(--ink); border-color: var(--line); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .tab-note { font-size: 11px; color: var(--ink-dim); margin: -4px 0 10px; padding: 0 2px;
+    display: flex; align-items: center; gap: 6px; }
+  .gw-panel { display: none; }
+  .gw-panel.active { display: block; }
+  .page-nav { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 6px; margin: 14px 0; overflow-x: auto; }
+  .page-nav a { color: var(--ink-dim); text-decoration: none; padding: 8px 14px; border-radius: 6px;
+    font-size: 13px; white-space: nowrap; font-weight: 500; }
+  .page-nav a:hover { background: var(--panel2); color: var(--ink); }
+  .page-nav a.active { background: var(--panel2); color: var(--ink); }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-empty { padding: 60px 20px; text-align: center; color: var(--ink-dim);
+    background: var(--panel); border: 1px dashed var(--line); border-radius: 12px; }
+  .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .overview-grid .span-2 { grid-column: 1 / -1; }
+  @media (max-width: 980px) { .overview-grid { grid-template-columns: 1fr; } }
+  .ov-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+  .ov-row { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 6px 8px; border-radius: 6px; gap: 12px; border-bottom: 1px solid #edf1f6; }
+  .ov-row:last-child { border-bottom: none; }
+  .ov-row:hover { background: var(--panel2); }
+  .ov-row .k { color: var(--ink-dim); font-size: 13px; }
+  .ov-row .v { color: var(--ink); font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; text-align: right; }
+  .ov-tag { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 10px;
+    margin-left: 6px; font-weight: 500; letter-spacing: .02em; text-transform: lowercase;
+    vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .ov-tag.unique { background: #dbeafe; color: #1e40af; }
+  .ov-tag.mixed  { background: #f1f5f9; color: #475569; }
+  .ov-tag.dups   { background: #fee2e2; color: #b91c1c; }
+  .ov-grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px; margin-top: 6px; }
+  .ov-stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; }
+  .ov-stat .k { font-size: 10px; text-transform: uppercase; color: var(--ink-dim);
+    letter-spacing: .08em; font-weight: 600; }
+  .ov-stat .v { font-size: 18px; font-weight: 600; margin-top: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
+  .ov-stat .s { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .tab-body { display: grid; grid-template-columns: 1fr 200px; gap: 14px; align-items: stretch; }
+  @media (max-width: 900px) { .tab-body { grid-template-columns: 1fr; } }
+  .tab-chart { min-width: 0; }
+  .tab-sensors { border-left: 1px solid var(--line); padding-left: 12px;
+    display: flex; flex-direction: column; }
+  @media (max-width: 900px) { .tab-sensors { border-left: none; border-top: 1px solid var(--line);
+    padding: 12px 0 0; } }
+  .tab-sensors-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ink-dim); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center;
+    justify-content: space-between; gap: 6px; }
+  .tab-sensors-list { display: flex; flex-direction: column; gap: 4px; max-height: 340px;
+    overflow-y: auto; }
+  .tab-sensors-list label { display: flex; align-items: center; gap: 8px; font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer;
+    padding: 3px 4px; border-radius: 4px; }
+  .tab-sensors-list label:hover { background: var(--panel2); }
+  .tab-sensors-list .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .mini-link { background: transparent; border: none; color: var(--accent); cursor: pointer;
+    font-size: 11px; padding: 2px 4px; font-family: inherit; }
+  .mini-link:hover { text-decoration: underline; }
+
+  details.context { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; margin-top: 22px; }
+  details.context > summary { cursor: pointer; font-size: 13px; color: var(--ink); padding: 4px 0;
+    list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.context > summary::before { content: "▸"; color: var(--ink-dim); transition: transform .15s; }
+  details.context[open] > summary::before { transform: rotate(90deg); }
+  details.context .context-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 12px; }
+  @media (max-width: 980px) { details.context .context-body { grid-template-columns: 1fr; } }
+
+  #map { height: 340px; border-radius: 10px; overflow: hidden; }
+  .map-wrap { position: relative; }
+  .map-wrap:fullscreen { background: var(--bg); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .map-wrap:fullscreen #map { flex: 1; height: 100% !important; border-radius: 0; }
+  .map-fs-btn { position: absolute; top: 10px; right: 10px; z-index: 1000;
+    background: rgba(255, 255, 255, 0.92); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px; line-height: 1;
+    font-family: inherit; }
+  .map-fs-btn:hover { background: #ffffff; border-color: var(--accent); }
+  .map-filters { display: flex; flex-wrap: wrap; gap: 16px; padding: 6px 2px 12px;
+    font-size: 13px; color: var(--ink); }
+  .map-filters label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .map-tooltip { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    min-width: 260px; max-width: 360px; }
+  .map-tooltip .k { color: var(--ink-dim); white-space: nowrap; }
+  .map-tooltip .v { word-break: break-word; }
+  .leaflet-container { background: #e5e7eb; }
+  .hidden { display: none !important; }
+  .muted { color: var(--ink-dim); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px;
+    background: var(--panel2); color: var(--ink-dim); margin-left: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gateway Report — Boomerang Sensor Analyzer</h1>
+  <div class="header-controls">
+    <label class="hc-group">From <input id="fromDate" type="date" /></label>
+    <label class="hc-group">To <input id="toDate" type="date" /></label>
+    <label class="hc-group">TZ
+      <select id="tzSelect">
+        <option value="Asia/Kolkata">Asia/Kolkata — IST</option>
+        <option value="UTC">UTC</option>
+        <option value="America/New_York">America/New_York — Eastern</option>
+        <option value="America/Chicago">America/Chicago — Central</option>
+        <option value="America/Denver">America/Denver — Mountain</option>
+        <option value="America/Los_Angeles">America/Los_Angeles — Pacific</option>
+        <option value="Europe/London">Europe/London</option>
+        <option value="Europe/Berlin">Europe/Berlin</option>
+        <option value="Europe/Istanbul">Europe/Istanbul</option>
+        <option value="Asia/Dubai">Asia/Dubai</option>
+        <option value="Asia/Singapore">Asia/Singapore</option>
+        <option value="Asia/Tokyo">Asia/Tokyo</option>
+        <option value="Australia/Sydney">Australia/Sydney</option>
+      </select>
+    </label>
+    <div class="dropdown" id="stateDropdown">
+      <button type="button" class="dropdown-btn" data-dd="stateDropdown">
+        State <span class="dd-count" id="stateDdCount">–</span><span class="caret">▾</span>
+      </button>
+      <div class="dropdown-panel">
+        <div class="dropdown-panel-label">Gateway state</div>
+        <div id="states" class="checks"></div>
+      </div>
+    </div>
+    <div class="dropdown" id="sensorDropdown">
+      <button type="button" class="dropdown-btn" data-dd="sensorDropdown">
+        Boomerangs <span class="dd-count" id="sensorDdCount">–</span><span class="caret">▾</span>
+      </button>
+      <div class="dropdown-panel wide">
+        <div class="dropdown-panel-label">
+          <span>Boomerang sensor IDs</span>
+          <span id="sensorCount" class="tag"></span>
+          <span class="tag muted" style="font-weight:400">edit to rename · clear to exclude · + to add</span>
+        </div>
+        <div id="sensorFields" class="sensor-fields"></div>
+      </div>
+    </div>
+    <button id="resetBtn" class="btn small">Reset</button>
+  </div>
+  <div class="spacer"></div>
+  <span id="fileName" class="file-name">no file loaded</span>
+  <label class="file-label">
+    Upload .xlsx / .csv
+    <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
+  </label>
+</header>
+
+<main>
+  <div id="hint" class="hint">
+    <p><b>Upload a gateway report (.xlsx or .csv)</b> to analyze it.<br/>
+    Expected schema: row 1 blank, row 2 header, 68 columns beginning with <code>gateway_id</code>.</p>
+    <p class="muted" style="font-size:12px">Everything runs in your browser — no data is uploaded to a server.</p>
+  </div>
+
+  <div id="app" class="hidden">
+
+    <div class="wagon-widget" id="wagonWidget" role="button" aria-label="Go to Wagon page">
+      <span class="wlabel">Wagon</span>
+      <div class="wimg" id="wagonWidgetImg">
+        <img src="Light-railcar-horizontal-removebg-preview.png" alt="Railcar" draggable="false"
+             data-light="Light-railcar-horizontal-removebg-preview.png"
+             data-dark="Dark-Railcar-Horizontal-removebg-preview.png"/>
+        <div class="wheel-dot" data-pos="L1" style="top:25%; left:9%;"></div>
+        <div class="wheel-dot" data-pos="L2" style="top:25%; left:26%;"></div>
+        <div class="wheel-dot" data-pos="L3" style="top:25%; left:76%;"></div>
+        <div class="wheel-dot" data-pos="L4" style="top:25%; left:91%;"></div>
+        <div class="wheel-dot" data-pos="R1" style="top:75%; left:9%;"></div>
+        <div class="wheel-dot" data-pos="R2" style="top:75%; left:26%;"></div>
+        <div class="wheel-dot" data-pos="R3" style="top:75%; left:76%;"></div>
+        <div class="wheel-dot" data-pos="R4" style="top:75%; left:91%;"></div>
+        <div class="gateway-rect" style="top:110.8%; left:91%;" title="Gateway">GW</div>
+      </div>
+      <div class="wmap" id="wagonWidgetMap"></div>
+      <span class="link">Open →</span>
+    </div>
+
+    <nav class="page-nav" id="pageNav">
+      <a href="#/overview"  data-route="overview">Overview</a>
+      <a href="#/boomerang" data-route="boomerang">Boomerang</a>
+      <a href="#/wagon"     data-route="wagon">Wagon</a>
+      <a href="#/gateway"   data-route="gateway">Gateway</a>
+      <a href="#/map"       data-route="map">Map</a>
+      <a href="#/gps"       data-route="gps">GPS</a>
+      <a href="#/rssi"      data-route="rssi">Connectivity</a>
+      <a href="#/timeline"  data-route="timeline">Timeline</a>
+    </nav>
+
+    <div class="page" id="page-overview">
+      <section class="block">
+        <h2>Overview</h2>
+        <div style="color: var(--ink-dim); font-size: 12px; margin: -6px 0 12px;">
+          Counts shown as <b style="color: var(--ink)">unique / total</b>. Tags:
+          <span class="ov-tag unique">unique</span> de-duplicated ·
+          <span class="ov-tag dups">dups</span> duplicates only.
+        </div>
+        <div class="overview-grid">
+          <div class="panel span-2"><h4>Test information</h4><div class="ov-rows" id="ovTest"></div></div>
+          <div class="panel"><h4>Gateway heartbeat performance</h4><div class="ov-rows" id="ovGwPerf"></div></div>
+          <div class="panel"><h4>Boomerang performance</h4><div class="ov-rows" id="ovBoomPerf"></div></div>
+          <div class="panel"><h4>Movement state distribution</h4><div class="ov-rows" id="ovState"></div></div>
+          <div class="panel"><h4>Connectivity</h4><div class="ov-rows" id="ovConn"></div></div>
+        </div>
+        <div class="panel" style="margin-top: 12px;">
+          <h4>Gateway health</h4>
+          <table class="dup-table" id="ovHealth"></table>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-boomerang">
+    <section class="block">
+      <h2>Boomerang sensors</h2>
+      <div class="panel">
+        <div class="tabs-bar" id="boomTabs">
+          <button class="tab active" type="button" data-tab="summary">Summary</button>
+          <button class="tab" type="button" data-tab="A">Samples / sensor</button>
+          <button class="tab" type="button" data-tab="unassigned">Unassigned Boomerangs</button>
+          <button class="tab" type="button" data-tab="dup">Duplicates</button>
+          <button class="tab" type="button" data-tab="B">accel_long_max stats</button>
+          <button class="tab" type="button" data-tab="C">Bearing temp over time</button>
+          <button class="tab" type="button" data-tab="D">long vs vert (by state)</button>
+          <button class="tab" type="button" data-tab="E">adxl_max distribution</button>
+          <button class="tab" type="button" data-tab="F">Battery V over time</button>
+        </div>
+        <div class="tab-note" id="boomTabNote"></div>
+        <div class="tab-body">
+          <div class="tab-chart">
+            <div class="tab-panel active" data-panel="summary">
+              <div class="chart-wrap tall"><canvas id="chartSummary"></canvas></div>
+              <div id="summaryTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="A">
+              <div class="chart-wrap tall"><canvas id="chartA"></canvas></div>
+              <div id="aTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="unassigned">
+              <div class="ov-grid-stats" id="unassignedStats"></div>
+              <div id="unassignedTableWrap" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="dup">
+              <div class="chart-wrap tall"><canvas id="chartDup"></canvas></div>
+              <div id="dupTableWrap" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="B">
+              <div class="chart-wrap tall"><canvas id="chartB"></canvas></div>
+              <div id="bTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="C">
+              <div class="chart-wrap tall"><canvas id="chartC"></canvas></div>
+              <div id="cTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="D">
+              <div class="chart-wrap tall"><canvas id="chartD"></canvas></div>
+              <div id="dTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="E">
+              <div class="chart-wrap tall"><canvas id="chartE"></canvas></div>
+              <div id="eTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+            <div class="tab-panel" data-panel="F">
+              <div class="chart-wrap tall"><canvas id="chartF"></canvas></div>
+              <div id="fTable" class="dup-table-wrap" style="margin-top: 14px;"></div>
+            </div>
+          </div>
+          <aside class="tab-sensors">
+            <div class="tab-sensors-label">
+              <span>Sensors in chart</span>
+              <span>
+                <button type="button" class="mini-link" id="tabSensorsAll">all</button>
+                <button type="button" class="mini-link" id="tabSensorsNone">none</button>
+              </span>
+            </div>
+            <div class="tab-sensors-list" id="tabSensorsList"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+    </div>
+
+    <div class="page" id="page-gateway">
+      <section class="block">
+        <h2>Gateway</h2>
+        <div class="panel">
+          <div class="tabs-bar" id="gwTabs">
+            <button class="tab active" type="button" data-gw="voltage">Battery / Solar / RSSI</button>
+            <button class="tab" type="button" data-gw="state">State over time</button>
+          </div>
+          <div class="tab-note" id="gwTabNote"></div>
+          <div class="gw-panel active" data-gwpanel="voltage"><div class="chart-wrap tall"><canvas id="chartG"></canvas></div></div>
+          <div class="gw-panel" data-gwpanel="state"><div class="chart-wrap tall"><canvas id="chartH"></canvas></div></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-wagon">
+      <section class="block">
+        <h2>Wagon — bogie close-up</h2>
+        <div class="panel">
+          <div class="wagon-diagram-wrap" id="wagonDiagramWrap">
+            <div class="wagon-page-img" id="wagonPageImg">
+              <img src="Light-railcar-vertical-removebg-preview.png" alt="Railcar" draggable="false"
+                   data-light="Light-railcar-vertical-removebg-preview.png"
+                   data-dark="Dark-Railcar-Vertical-removebg-preview.png"/>
+              <div class="wheel-dot" data-pos="L1" style="top:13.25%; left:8%;">L1</div>
+              <div class="wheel-dot" data-pos="L2" style="top:28%; left:8%;">L2</div>
+              <div class="wheel-dot" data-pos="L3" style="top:72.7%; left:8%;">L3</div>
+              <div class="wheel-dot" data-pos="L4" style="top:87.7%; left:8%;">L4</div>
+              <div class="wheel-dot" data-pos="R1" style="top:13.25%; left:92%;">R1</div>
+              <div class="wheel-dot" data-pos="R2" style="top:28%; left:92%;">R2</div>
+              <div class="wheel-dot" data-pos="R3" style="top:72.7%; left:92%;">R3</div>
+              <div class="wheel-dot" data-pos="R4" style="top:87.7%; left:92%;">R4</div>
+              <div class="gateway-rect" style="top:87.7%; left:-6%;" title="Gateway device">GW</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-map">
+      <section class="block">
+        <h2>Map</h2>
+        <div class="panel">
+          <div class="map-wrap" id="mapWrap">
+            <div class="map-filters">
+              <label><input type="checkbox" id="mapShowHeartbeat" checked /> Heartbeats <span class="muted" style="font-size:11px">(no Boomerang data)</span></label>
+              <label><input type="checkbox" id="mapShowBoomerang" checked /> Boomerang packets</label>
+            </div>
+            <div id="map"></div>
+            <button type="button" class="map-fs-btn" id="mapFsBtn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⛶</button>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top: 12px;">
+          <div class="panel">
+            <h4>GPS fix quality</h4>
+            <table class="dup-table" id="mapGpsFixTable"></table>
+          </div>
+          <div class="panel">
+            <h4>GPS coverage</h4>
+            <div class="ov-rows" id="mapGpsCoverage"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-rssi">
+      <section class="block">
+        <h2>Connectivity</h2>
+        <div class="panel">
+          <h4>Overall statistics</h4>
+          <div class="ov-grid-stats" id="rssiStats"></div>
+        </div>
+        <div class="connectivity-main">
+          <div class="connectivity-stack">
+            <div class="panel">
+              <h4>RSSI by movement state</h4>
+              <table class="dup-table" id="rssiByState"></table>
+            </div>
+            <div class="panel">
+              <h4>Cellular operators (MCC-MNC)</h4>
+              <table class="dup-table" id="connCellOpTable"></table>
+            </div>
+            <div class="panel">
+              <h4>Cell tower statistics</h4>
+              <div class="ov-rows" id="connCellTowerStats"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h4>Signal strength distribution</h4>
+            <div class="chart-wrap" style="height: 220px;"><canvas id="chartRssiDist"></canvas></div>
+            <table class="dup-table" id="rssiDistTable" style="margin-top: 10px;"></table>
+          </div>
+        </div>
+        <div class="panel" style="margin-top: 12px;">
+          <h4>RSSI location extremes</h4>
+          <div class="rssi-extremes">
+            <div class="rssi-extreme-table">
+              <h4>Worst RSSI readings</h4>
+              <table class="dup-table compact" id="rssiWorstTable"></table>
+            </div>
+            <div class="rssi-extreme-table">
+              <h4>Best RSSI readings</h4>
+              <table class="dup-table compact" id="rssiBestTable"></table>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top: 12px;">
+          <h4>Top 10 most-used cell towers</h4>
+          <table class="dup-table" id="connCellTop10"></table>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-gps">
+      <section class="block">
+        <h2>GPS &amp; connectivity</h2>
+        <div class="grid-2">
+          <div class="panel">
+            <h4>GPS fix quality</h4>
+            <table class="dup-table" id="gpsFixTable"></table>
+          </div>
+          <div class="panel">
+            <h4>GPS coverage</h4>
+            <div class="ov-rows" id="gpsCoverage"></div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top: 12px;">
+          <div class="panel">
+            <h4>Cellular operators (MCC-MNC)</h4>
+            <table class="dup-table" id="cellOpTable"></table>
+          </div>
+          <div class="panel">
+            <h4>Cell tower statistics</h4>
+            <div class="ov-rows" id="cellTowerStats"></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top: 12px;">
+          <h4>Top 10 most-used cell towers</h4>
+          <table class="dup-table" id="cellTop10"></table>
+        </div>
+      </section>
+    </div>
+
+    <div class="page" id="page-timeline">
+      <section class="block">
+        <h2>Timeline — daily breakdown</h2>
+        <div class="panel">
+          <div class="timeline-legend">
+            <span class="legend-group"><span class="legend-title">RSSI</span>
+              <span class="rssi-token rssi-very-weak">&le;-120</span>
+              <span class="rssi-token rssi-weak">-119..-111</span>
+              <span class="rssi-token rssi-fair">-110..-101</span>
+              <span class="rssi-token rssi-good">-100..-91</span>
+              <span class="rssi-token rssi-strong">&ge;-90</span>
+            </span>
+            <span class="legend-group"><span class="legend-title">Battery</span>
+              <span class="voltage-token voltage-critical">&lt;3.50</span>
+              <span class="voltage-token voltage-low">3.50-3.79</span>
+              <span class="voltage-token voltage-ok">3.80-4.79</span>
+              <span class="voltage-token voltage-high">&ge;4.80</span>
+            </span>
+            <span class="legend-group"><span class="legend-title">Solar</span>
+              <span class="voltage-token voltage-critical">&lt;0.10</span>
+              <span class="voltage-token voltage-low">0.10-0.29</span>
+              <span class="voltage-token voltage-ok">0.30-0.79</span>
+              <span class="voltage-token voltage-high">&ge;0.80</span>
+            </span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="dup-table" id="timelineTable"></table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </div>
+</main>
+
+<script src="xlsx.full.min.js"></script>
+<script src="chart.umd.min.js"></script>
+<script src="leaflet.js"></script>
+
+<script>
+// ---------- Schema (fixed, per plan) ----------
+const COLS = [
+  "gateway_id","gateway_type","epoch_seconds","gateway_state","current_config_id",
+  "battery_voltage_centivolts","solar_voltage_centivolts","system_temperature_celsius",
+  "GPSScan_timestamp","GPSScan_fix_type","GPSScan_velocity_kmh","GPSScan_heading_degrees",
+  "GPSScan_sats_locked","GPSScan_sats_in_view","GPSScan_pdop","GPSScan_geopoint_accuracy_cm",
+  "GPSScan_elevation_accuracy_cm","GPSScan_latitude_1e7","GPSScan_longitude_1e7","GPSScan_elevation_cm",
+  "CellScan_mcc","CellScan_mnc","CellScan_cid","CellScan_las","CellScan_rssi",
+  "BoomerangData_type","BoomerangData_id","BoomerangData_epoch_seconds","BoomerangData_rms",
+  "BoomerangData_pcb_accel_lat_max","BoomerangData_pcb_accel_lat_rms",
+  "BoomerangData_pcb_accel_vert_max","BoomerangData_pcb_accel_vert_rms",
+  "BoomerangData_pcb_accel_long_max","BoomerangData_pcb_accel_long_rms",
+  "BoomerangData_adxl_max","BoomerangData_adxl_rms",
+  "BoomerangData_boomerang_temp","BoomerangData_bearing_temp",
+  "BoomerangData_battery_voltage_centivolts","BoomerangData_bearing_temperature_celsius",
+  "ValveData_type","ValveData_sensor_id","ValveData_epoch_seconds","ValveData_battery_voltage_centivolts",
+  "ValveData_status","ValveData_hall_sense","ValveData_raw_mag",
+  "GatewayImpact_epoch_seconds","GatewayImpact_pre_impact_velocity_kmh",
+  "GatewayImpact_impact_z_max","GatewayImpact_impact_z_sum","GatewayImpact_impact_y_max",
+  "GatewayImpact_impact_y_sum","GatewayImpact_impact_x_max","GatewayImpact_impact_x_sum",
+  "GatewayImpact_impact_z_data","GatewayImpact_impact_y_data","GatewayImpact_impact_x_data",
+  "GatewayImpact_x_accelerometer_post_millag","GatewayImpact_y_accelerometer_post_millag",
+  "GatewayImpact_z_accelerometer_post_millag",
+  "StrainGaugeData_type","StrainGaugeData_id","StrainGaugeData_epoch_seconds",
+  "StrainGaugeData_strain_raw","StrainGaugeData_temp_raw","StrainGaugeData_strain_delta_per_minute",
+];
+const STATE_LABELS = ["currently_parked","currently_moving","was_parked_now_moving","was_moving_now_parked"];
+const STATE_COLORS = { currently_parked:"#76B7B2", currently_moving:"#4E79A7",
+  was_parked_now_moving:"#F28E2B", was_moving_now_parked:"#E15759" };
+const PALETTE = ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F","#EDC948",
+  "#B07AA1","#FF9DA7","#9C755F","#6E9BD1","#D1A44E","#499894"];
+const DEFAULT_FILE = "Railcar-GPS-logs.xlsx";
+const DEFAULT_BOOMERANGS = ["3958731024","1476809983","3808962873","3840020071","1642710134","754300368","3566806837","2433278579"];
+const DEFAULT_WAGON_MAP = {
+  L1: "3958731024",
+  L2: "1476809983",
+  L3: "3808962873",
+  L4: "3840020071",
+  R1: "1642710134",
+  R2: "754300368",
+  R3: "3566806837",
+  R4: "2433278579",
+};
+
+// ---------- App state ----------
+const state = {
+  rows: [],            // raw parsed rows (all)
+  validTsRows: [],     // rows with ts_valid
+  allSensorIds: [],    // distinct Boomerang sensor IDs across the whole file (strings)
+  sensorColor: {},     // keyed by id (stable across file)
+  tsMin: null, tsMax: null,  // overall file bounds (UTC Dates)
+  tz: "Asia/Kolkata",
+  fromUtc: null, toUtc: null, // window (UTC Dates)
+  filter: {
+    selectedStates: new Set(STATE_LABELS),
+    sensorFilter: new Map(), // key(original id) -> current input value; only non-empty keys pass filter
+    extraIds: [],            // manually added ids (strings)
+    excludedIds: new Set(),  // window IDs explicitly removed with the x button
+  },
+  charts: {},
+  map: null,
+  mapLayer: null,
+  activeBoomTab: "summary",
+  activeGwTab: "voltage",
+  tabSensorSelection: new Set(), // sensor IDs checked in the right-side tab list
+  unassignedSensorSelection: new Set(),
+  unassignedSensorSelectionInitialized: false,
+  mapShowHeartbeat: true,
+  mapShowBoomerang: true,
+  route: "boomerang",
+  wagonMap: { L1: null, R1: null, L2: null, R2: null, L3: null, R3: null, L4: null, R4: null },
+};
+const ROUTES = ["overview","boomerang","wagon","gateway","map","rssi","gps","timeline"];
+const WAGON_POSITIONS = ["L1","R1","L2","R2","L3","R3","L4","R4"];
+const WAGON_LABELS = {
+  L1: "Bogie A · Axle 1 · Left",  R1: "Bogie A · Axle 1 · Right",
+  L2: "Bogie A · Axle 2 · Left",  R2: "Bogie A · Axle 2 · Right",
+  L3: "Bogie B · Axle 3 · Left",  R3: "Bogie B · Axle 3 · Right",
+  L4: "Bogie B · Axle 4 · Left",  R4: "Bogie B · Axle 4 · Right",
+};
+function currentRoute() {
+  const h = (location.hash || "").replace(/^#\/?/, "").trim();
+  return ROUTES.includes(h) ? h : "boomerang";
+}
+function updateRouteUI() {
+  state.route = currentRoute();
+  document.querySelectorAll(".page").forEach(p => {
+    p.classList.toggle("active", p.id === `page-${state.route}`);
+  });
+  document.querySelectorAll("#pageNav a").forEach(a => {
+    a.classList.toggle("active", a.dataset.route === state.route);
+  });
+}
+window.addEventListener("hashchange", () => {
+  updateRouteUI();
+  rerender();
+  if (state.route === "map" && state.map) setTimeout(() => state.map.invalidateSize(), 60);
+});
+
+// ---------- Dropdown toggle ----------
+document.getElementById("wagonWidget").addEventListener("click", () => {
+  location.hash = "#/wagon";
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".dropdown-btn");
+  if (btn) {
+    const dd = btn.closest(".dropdown");
+    const wasOpen = dd.classList.contains("open");
+    document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open"));
+    if (!wasOpen) dd.classList.add("open");
+    e.stopPropagation();
+    return;
+  }
+  if (!e.target.closest(".dropdown-panel")) {
+    document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open"));
+  }
+});
+
+function updateDropdownCounts() {
+  const stateTotal = STATE_LABELS.length;
+  const stateOn = state.filter.selectedStates.size;
+  const stateEl = document.getElementById("stateDdCount");
+  if (stateEl) stateEl.textContent = `${stateOn}/${stateTotal}`;
+  const sensorTotal = state.filter.sensorFilter.size;
+  const sensorOn = activeSensorIds().size;
+  const sensorEl = document.getElementById("sensorDdCount");
+  if (sensorEl) sensorEl.textContent = `${sensorOn}/${sensorTotal}`;
+}
+
+// ---------- Entry ----------
+document.getElementById("fileInput").addEventListener("change", handleFile);
+document.getElementById("resetBtn").addEventListener("click", () => {
+  state.filter.selectedStates = new Set(STATE_LABELS);
+  state.tz = "Asia/Kolkata";
+  document.getElementById("tzSelect").value = state.tz;
+  if (state.tsMin && state.tsMax) {
+    document.getElementById("fromDate").value = "2026-03-11";
+    const candidate = parseDateInputToUtc("fromDate", state.tz, false);
+    if (!candidate || candidate.getTime() < state.tsMin.getTime()
+                   || candidate.getTime() > state.tsMax.getTime()) {
+      setDateInputFromUtc("fromDate", state.tsMin, state.tz);
+    }
+    setDateInputFromUtc("toDate", state.tsMax, state.tz);
+    state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
+    state.toUtc   = parseDateInputToUtc("toDate",   state.tz, true);
+  }
+  applyDefaultBoomerangSetup();
+  rebuildSensorFields();
+  syncStates();
+  rerender();
+});
+document.getElementById("tzSelect").addEventListener("change", e => {
+  const newTz = e.target.value;
+  // Preserve the wall-clock the user currently sees: re-read existing date inputs as new TZ.
+  const fromStr = document.getElementById("fromDate").value;
+  const toStr   = document.getElementById("toDate").value;
+  state.tz = newTz;
+  if (fromStr) state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
+  if (toStr)   state.toUtc   = parseDateInputToUtc("toDate",   state.tz, true);
+  rebuildSensorFields();
+  rerender();
+});
+document.getElementById("fromDate").addEventListener("change", () => {
+  state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
+  rebuildSensorFields();
+  rerender();
+});
+document.getElementById("toDate").addEventListener("change", () => {
+  state.toUtc = parseDateInputToUtc("toDate", state.tz, true);
+  rebuildSensorFields();
+  rerender();
+});
+document.getElementById("boomTabs").addEventListener("click", e => {
+  const btn = e.target.closest(".tab");
+  if (!btn) return;
+  state.activeBoomTab = btn.dataset.tab;
+  updateBoomTabUI();
+  renderTabSensorList();
+  rerender();
+});
+function updateBoomTabUI() {
+  document.querySelectorAll("#boomTabs .tab").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === state.activeBoomTab));
+  document.querySelectorAll(".tab-panel").forEach(p =>
+    p.classList.toggle("active", p.dataset.panel === state.activeBoomTab));
+  const note = document.getElementById("boomTabNote");
+  if (note) {
+    note.innerHTML = state.activeBoomTab === "unassigned"
+      ? `<span class="ov-tag mixed">mixed</span> boomerang IDs not assigned to this wagon in the current setup`
+      : state.activeBoomTab === "dup"
+      ? `<span class="ov-tag mixed">mixed</span> showing all readings including duplicates`
+      : `<span class="ov-tag unique">unique</span> showing de-duplicated readings`;
+  }
+}
+document.getElementById("gwTabs").addEventListener("click", e => {
+  const btn = e.target.closest(".tab");
+  if (!btn) return;
+  state.activeGwTab = btn.dataset.gw;
+  updateGwTabUI();
+  rerender();
+  // Leaflet needs a size recalc when its container becomes visible.
+  if (state.activeGwTab === "map" && state.map) {
+    setTimeout(() => state.map.invalidateSize(), 60);
+  }
+});
+function updateGwTabUI() {
+  document.querySelectorAll("#gwTabs .tab").forEach(b =>
+    b.classList.toggle("active", b.dataset.gw === state.activeGwTab));
+  document.querySelectorAll(".gw-panel").forEach(p =>
+    p.classList.toggle("active", p.dataset.gwpanel === state.activeGwTab));
+  const note = document.getElementById("gwTabNote");
+  if (note) {
+    note.textContent = state.activeGwTab === "voltage"
+      ? "Battery, solar, and RSSI are averaged inside 40 time buckets. Blank/null values are excluded."
+      : "State counts are grouped into 40 time buckets from de-duplicated gateway records.";
+  }
+}
+document.getElementById("mapShowHeartbeat").addEventListener("change", e => {
+  state.mapShowHeartbeat = e.target.checked;
+  if (state.route === "map") rerender();
+});
+document.getElementById("mapShowBoomerang").addEventListener("change", e => {
+  state.mapShowBoomerang = e.target.checked;
+  if (state.route === "map") rerender();
+});
+document.getElementById("mapFsBtn").addEventListener("click", () => {
+  const el = document.getElementById("mapWrap");
+  if (!document.fullscreenElement) {
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  if (state.map) setTimeout(() => state.map.invalidateSize(), 80);
+});
+document.addEventListener("webkitfullscreenchange", () => {
+  if (state.map) setTimeout(() => state.map.invalidateSize(), 80);
+});
+document.getElementById("tabSensorsAll").addEventListener("click", () => {
+  if (state.route === "boomerang" && state.activeBoomTab === "unassigned") {
+    state.unassignedSensorSelection = new Set(unassignedSensorIdsInWindow());
+    state.unassignedSensorSelectionInitialized = true;
+  } else {
+    state.tabSensorSelection = new Set(activeSensorIds());
+  }
+  renderTabSensorList();
+  rerender();
+});
+document.getElementById("tabSensorsNone").addEventListener("click", () => {
+  if (state.route === "boomerang" && state.activeBoomTab === "unassigned") {
+    state.unassignedSensorSelection = new Set();
+    state.unassignedSensorSelectionInitialized = true;
+  } else {
+    state.tabSensorSelection = new Set();
+  }
+  renderTabSensorList();
+  rerender();
+});
+
+function renderTabSensorList() {
+  const host = document.getElementById("tabSensorsList");
+  host.innerHTML = "";
+  const label = document.querySelector(".tab-sensors-label > span:first-child");
+  const isUnassignedTab = state.route === "boomerang" && state.activeBoomTab === "unassigned";
+  const ids = isUnassignedTab ? unassignedSensorIdsInWindow() : Array.from(activeSensorIds());
+  const selection = isUnassignedTab ? state.unassignedSensorSelection : state.tabSensorSelection;
+  if (label) label.textContent = isUnassignedTab ? "Unassigned IDs" : "Sensors in chart";
+  // Trim selection to only currently-active ids
+  for (const id of Array.from(selection))
+    if (!ids.includes(id)) selection.delete(id);
+  if (isUnassignedTab && !state.unassignedSensorSelectionInitialized && ids.length) {
+    for (const id of ids) selection.add(id);
+    state.unassignedSensorSelectionInitialized = true;
+  }
+  if (!ids.length) {
+    host.innerHTML = `<div class="muted" style="font-size:12px">${isUnassignedTab ? "No unassigned IDs" : "No sensors in window"}</div>`;
+    return;
+  }
+  for (const id of ids) {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selection.has(id);
+    cb.addEventListener("change", () => {
+      if (cb.checked) selection.add(id);
+      else selection.delete(id);
+      if (isUnassignedTab) state.unassignedSensorSelectionInitialized = true;
+      rerender();
+    });
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = state.sensorColor[id] || "#888";
+    lab.append(cb, sw, document.createTextNode(id));
+    host.appendChild(lab);
+  }
+}
+
+// Intersection of filter-panel active IDs and tab-panel checkbox selection.
+function tabSensorIds() {
+  const active = activeSensorIds();
+  const out = new Set();
+  for (const id of state.tabSensorSelection) if (active.has(id)) out.add(id);
+  return out;
+}
+
+function handleFile(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById("fileName").textContent = f.name;
+  const reader = new FileReader();
+  const isCsv = /\.csv$/i.test(f.name);
+  reader.onload = ev => {
+    try {
+      loadWorkbookData(ev.target.result, isCsv ? "string" : "array", f.name);
+    } catch (err) {
+      alert("Failed to parse: " + err.message);
+      console.error(err);
+    }
+  };
+  if (isCsv) reader.readAsText(f);
+  else reader.readAsArrayBuffer(f);
+}
+
+function loadWorkbookData(data, type, fileName) {
+  const wb = XLSX.read(data, { type });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  // range:1 skips the blank row 1; row 2 becomes the header.
+  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, range: 1 });
+  if (!matrix || matrix.length < 2) throw new Error("No data rows found");
+  ingest(matrix);
+  document.getElementById("fileName").textContent = fileName;
+  document.getElementById("hint").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  if (!location.hash) location.hash = "#/overview";
+  updateRouteUI();
+  rerender();
+}
+
+async function loadDefaultWorkbook() {
+  if (state.rows.length) return;
+  try {
+    document.getElementById("fileName").textContent = `loading ${DEFAULT_FILE}…`;
+    const data = await loadArrayBuffer(DEFAULT_FILE);
+    loadWorkbookData(data, "array", DEFAULT_FILE);
+  } catch (err) {
+    document.getElementById("fileName").textContent = "no file loaded";
+    console.warn("Default workbook could not be loaded", err);
+  }
+}
+
+function loadArrayBuffer(url) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url, true);
+    xhr.responseType = "arraybuffer";
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+      else reject(new Error(`HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.send();
+  });
+}
+
+// ---------- Ingest ----------
+function ingest(matrix) {
+  const dataRows = matrix.slice(1);  // skip header
+  const rows = [];
+  for (const r of dataRows) {
+    if (!r || r.every(v => v === null || v === undefined || v === "")) continue;
+    const o = {};
+    for (let i = 0; i < COLS.length; i++) o[COLS[i]] = r[i] ?? null;
+    // Clean leading-apostrophe on gateway_id if present
+    if (typeof o.gateway_id === "string" && o.gateway_id.startsWith("'"))
+      o.gateway_id = o.gateway_id.slice(1);
+    // Derived
+    o.battery_V = numDiv(o.battery_voltage_centivolts, 100);
+    o.solar_V   = numDiv(o.solar_voltage_centivolts, 100);
+    o.boom_battery_V = numDiv(o.BoomerangData_battery_voltage_centivolts, 100);
+    o.lat = numDiv(o.GPSScan_latitude_1e7, 1e7);
+    o.lon = numDiv(o.GPSScan_longitude_1e7, 1e7);
+    const es = Number(o.epoch_seconds);
+    o.ts = Number.isFinite(es) ? new Date(es * 1000) : null;
+    // clock-drift cutoff: epoch_seconds < 2e9  (~ year 2033)
+    o.ts_valid = Number.isFinite(es) && es > 0 && es < 2_000_000_000;
+    // Boomerang sensor id as string key (ids are large ints)
+    o.sensor_key = o.BoomerangData_id != null ? String(o.BoomerangData_id) : null;
+    rows.push(o);
+  }
+  state.rows = rows;
+  state.validTsRows = rows.filter(r => r.ts_valid);
+  // Distinct sensor ids across the full file (for stable coloring)
+  const counts = {};
+  for (const r of rows) if (r.sensor_key) counts[r.sensor_key] = (counts[r.sensor_key]||0)+1;
+  state.allSensorIds = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+  state.sensorColor = {};
+  state.allSensorIds.forEach((id,i) => state.sensorColor[id] = PALETTE[i % PALETTE.length]);
+  // Time bounds (UTC) from valid-ts rows
+  if (state.validTsRows.length) {
+    let mn = Infinity, mx = -Infinity;
+    for (const r of state.validTsRows) {
+      const t = r.ts.getTime(); if (t < mn) mn = t; if (t > mx) mx = t;
+    }
+    state.tsMin = new Date(mn);
+    state.tsMax = new Date(mx);
+  } else {
+    state.tsMin = state.tsMax = null;
+  }
+  // Default TZ + date inputs + window
+  state.tz = document.getElementById("tzSelect").value || "Asia/Kolkata";
+  if (state.tsMin && state.tsMax) {
+    // Default start date = 2026-03-11 in the selected TZ.
+    // Fall back to data-min if 3/11 is outside the data range.
+    document.getElementById("fromDate").value = "2026-03-11";
+    const candidate = parseDateInputToUtc("fromDate", state.tz, false);
+    if (!candidate || candidate.getTime() < state.tsMin.getTime()
+                   || candidate.getTime() > state.tsMax.getTime()) {
+      setDateInputFromUtc("fromDate", state.tsMin, state.tz);
+    }
+    setDateInputFromUtc("toDate", state.tsMax, state.tz);
+    state.fromUtc = parseDateInputToUtc("fromDate", state.tz, false);
+    state.toUtc   = parseDateInputToUtc("toDate",   state.tz, true);
+  } else {
+    state.fromUtc = state.toUtc = null;
+  }
+  state.filter.selectedStates = new Set(STATE_LABELS);
+  applyDefaultBoomerangSetup();
+  buildStateChecks();
+  rebuildSensorFields();
+}
+
+function applyDefaultBoomerangSetup() {
+  const defaults = new Set(DEFAULT_BOOMERANGS);
+  state.filter.extraIds = DEFAULT_BOOMERANGS.filter(id => !state.allSensorIds.includes(id));
+  state.filter.excludedIds = new Set(state.allSensorIds.filter(id => !defaults.has(id)));
+  state.filter.sensorFilter = new Map(DEFAULT_BOOMERANGS.map(id => [id, id]));
+  state.tabSensorSelection = new Set(DEFAULT_BOOMERANGS);
+  state.unassignedSensorSelection = new Set();
+  state.unassignedSensorSelectionInitialized = false;
+  state.wagonMap = { ...DEFAULT_WAGON_MAP };
+}
+
+function numDiv(v, d) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "string" && v.trim() === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n / d : null;
+}
+
+// Boomerang-level dup key: two rows with the same (gateway epoch + BoomerangData epoch + all BoomerangData values)
+// for the same sensor are considered the same reading.
+const boomDupKey = r => [
+  r.epoch_seconds,
+  r.BoomerangData_epoch_seconds,
+  r.BoomerangData_rms,
+  r.BoomerangData_pcb_accel_lat_max,  r.BoomerangData_pcb_accel_lat_rms,
+  r.BoomerangData_pcb_accel_vert_max, r.BoomerangData_pcb_accel_vert_rms,
+  r.BoomerangData_pcb_accel_long_max, r.BoomerangData_pcb_accel_long_rms,
+  r.BoomerangData_adxl_max, r.BoomerangData_adxl_rms,
+  r.BoomerangData_boomerang_temp, r.BoomerangData_bearing_temp,
+  r.BoomerangData_battery_voltage_centivolts,
+  r.BoomerangData_bearing_temperature_celsius,
+].join("|");
+
+// Gateway-level dup key: two rows with identical gateway readings are the same gateway tick.
+const gwDupKey = r => [
+  r.epoch_seconds,
+  r.battery_voltage_centivolts,
+  r.solar_voltage_centivolts,
+  r.system_temperature_celsius,
+  r.current_config_id,
+  r.gateway_state,
+  r.CellScan_rssi,
+].join("|");
+
+function dedupeBoom(rows) {
+  const seen = new Set(); const out = [];
+  for (const r of rows) {
+    const k = `${r.sensor_key}|${boomDupKey(r)}`;
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(r);
+  }
+  return out;
+}
+function dedupeGw(rows) {
+  const seen = new Set(); const out = [];
+  for (const r of rows) {
+    const k = gwDupKey(r);
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(r);
+  }
+  return out;
+}
+
+// ---------- Controls ----------
+function buildStateChecks() {
+  const stEl = document.getElementById("states");
+  stEl.innerHTML = "";
+  for (const s of STATE_LABELS) {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = true; cb.value = s;
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.filter.selectedStates.add(s);
+      else state.filter.selectedStates.delete(s);
+      rerender();
+    });
+    const sw = document.createElement("span");
+    sw.style.cssText = `display:inline-block;width:10px;height:10px;border-radius:2px;background:${STATE_COLORS[s]};`;
+    lab.append(cb, sw, document.createTextNode(s));
+    stEl.appendChild(lab);
+  }
+}
+function syncStates() {
+  document.querySelectorAll("#states input[type=checkbox]").forEach(cb => {
+    cb.checked = state.filter.selectedStates.has(cb.value);
+  });
+}
+
+// Rebuild the Boomerang-ID input fields based on IDs present in the current [fromUtc, toUtc] window
+// plus any manually-added extras. Preserves the sensorFilter value map across rebuilds.
+function rebuildSensorFields() {
+  const prev = state.filter.sensorFilter;
+  const windowIds = distinctSensorIdsInWindow();
+  // Union of window IDs and manual extras (in order: window first, then extras)
+  const idsInOrder = [];
+  const seen = new Set();
+  for (const id of windowIds) {
+    if (state.filter.excludedIds.has(id)) continue;
+    if (!seen.has(id)) { seen.add(id); idsInOrder.push(id); }
+  }
+  for (const id of state.filter.extraIds) {
+    if (state.filter.excludedIds.has(id)) continue;
+    if (!seen.has(id)) { seen.add(id); idsInOrder.push(id); }
+  }
+
+  const next = new Map();
+  for (const id of idsInOrder) {
+    // Preserve a prior user-edited value if one exists for this id; otherwise default = id itself.
+    next.set(id, prev.has(id) ? prev.get(id) : id);
+  }
+  state.filter.sensorFilter = next;
+
+  const host = document.getElementById("sensorFields");
+  host.innerHTML = "";
+  document.getElementById("sensorCount").textContent =
+    `${idsInOrder.length} in window${state.allSensorIds.length ? ` · ${state.allSensorIds.length} in file` : ""}`;
+
+  for (const id of idsInOrder) {
+    host.appendChild(makeSensorField(id));
+  }
+  // Always include an "add" button
+  const addBtn = document.createElement("button");
+  addBtn.className = "sensor-add";
+  addBtn.type = "button";
+  addBtn.textContent = "+ add ID";
+  addBtn.addEventListener("click", () => {
+    const ask = prompt("Boomerang sensor ID to add:");
+    if (!ask) return;
+    const trimmed = String(ask).trim();
+    if (!trimmed) return;
+    if (!state.filter.extraIds.includes(trimmed)) state.filter.extraIds.push(trimmed);
+    rebuildSensorFields();
+    rerender();
+  });
+  host.appendChild(addBtn);
+  // Default the tab-panel checkbox list to all-selected when it hasn't been initialized yet,
+  // otherwise preserve the user's selection (trimmed to current active ids).
+  const active = activeSensorIds();
+  if (state.tabSensorSelection.size === 0) {
+    state.tabSensorSelection = new Set(active);
+  } else {
+    // Add newly-appeared IDs by default (opt-in), drop departed ones in renderTabSensorList.
+    for (const id of active) if (!state.tabSensorSelection.has(id)) state.tabSensorSelection.add(id);
+  }
+  renderTabSensorList();
+}
+
+function makeSensorField(id) {
+  const wrap = document.createElement("div");
+  wrap.className = "sensor-field";
+  const swatch = document.createElement("span");
+  swatch.className = "swatch";
+  swatch.style.background = state.sensorColor[id] || "#888";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = state.filter.sensorFilter.get(id) ?? id;
+  input.dataset.id = id;
+  input.addEventListener("input", () => {
+    state.filter.sensorFilter.set(id, input.value);
+    wrap.classList.toggle("empty", input.value.trim() === "");
+    rerender();
+  });
+  const rm = document.createElement("button");
+  rm.className = "rm"; rm.type = "button"; rm.title = "Remove"; rm.textContent = "×";
+  rm.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    state.filter.excludedIds.add(id);
+    state.filter.sensorFilter.delete(id);
+    state.filter.extraIds = state.filter.extraIds.filter(x => x !== id);
+    state.tabSensorSelection.delete(id);
+    rebuildSensorFields();
+    rerender();
+  });
+  wrap.append(swatch, input, rm);
+  wrap.classList.toggle("empty", (state.filter.sensorFilter.get(id) ?? "").trim() === "");
+  return wrap;
+}
+
+function distinctSensorIdsInWindow() {
+  const tA = state.fromUtc ? state.fromUtc.getTime() : -Infinity;
+  const tB = state.toUtc   ? state.toUtc.getTime()   :  Infinity;
+  const s = new Set();
+  for (const r of state.rows) {
+    if (!r.sensor_key) continue;
+    if (!r.ts_valid) continue;
+    const t = r.ts.getTime();
+    if (t < tA || t > tB) continue;
+    s.add(r.sensor_key);
+  }
+  // Sort by per-window sample count desc
+  const counts = {};
+  for (const id of s) counts[id] = 0;
+  for (const r of state.rows) {
+    if (!r.sensor_key || !s.has(r.sensor_key) || !r.ts_valid) continue;
+    const t = r.ts.getTime();
+    if (t < tA || t > tB) continue;
+    counts[r.sensor_key]++;
+  }
+  return [...s].sort((a,b) => counts[b] - counts[a]);
+}
+
+// Sensor IDs currently "active" = those whose input field is non-empty.
+function activeSensorIds() {
+  const out = new Set();
+  for (const [id, val] of state.filter.sensorFilter.entries()) {
+    if (val != null && String(val).trim() !== "") out.add(id);
+  }
+  return out;
+}
+
+// ---------- Filter ----------
+function applyFilter(rows) {
+  const active = activeSensorIds();
+  const st = state.filter.selectedStates;
+  const tA = state.fromUtc ? state.fromUtc.getTime() : null;
+  const tB = state.toUtc   ? state.toUtc.getTime()   : null;
+  return rows.filter(r => {
+    if (!st.has(r.gateway_state)) return false;
+    if (r.sensor_key && !active.has(r.sensor_key)) return false;
+    if (tA != null || tB != null) {
+      if (!r.ts_valid) return false;
+      const t = r.ts.getTime();
+      if (tA != null && t < tA) return false;
+      if (tB != null && t > tB) return false;
+    }
+    return true;
+  });
+}
+
+function applyWindowStateFilter(rows) {
+  const st = state.filter.selectedStates;
+  const tA = state.fromUtc ? state.fromUtc.getTime() : null;
+  const tB = state.toUtc   ? state.toUtc.getTime()   : null;
+  return rows.filter(r => {
+    if (!st.has(r.gateway_state)) return false;
+    if (tA != null || tB != null) {
+      if (!r.ts_valid) return false;
+      const t = r.ts.getTime();
+      if (tA != null && t < tA) return false;
+      if (tB != null && t > tB) return false;
+    }
+    return true;
+  });
+}
+
+// ---------- Render ----------
+function rerender() {
+  updateDropdownCounts();
+  const all = applyFilter(state.rows);
+  const boom = all.filter(r => r.sensor_key);
+  const tsAll = all.filter(r => r.ts_valid);
+  const heartbeats = all.filter(r => !r.sensor_key);
+  // Deduped views — used by every tab EXCEPT the Duplicates tab and the Map tab.
+  const boomDD = dedupeBoom(boom);
+  const tsAllDD = dedupeGw(tsAll);
+  // Tab-panel charts respect the right-side sensor checkbox list.
+  const tabSet = tabSensorIds();
+  const tabBoom   = boom.filter(r => tabSet.has(r.sensor_key));                    // raw, for Duplicates tab
+  const tabBoomDD = boomDD.filter(r => tabSet.has(r.sensor_key));                  // deduped
+  const tabTsBoomDD = tabBoomDD.filter(r => r.ts_valid);
+
+  switch (state.route) {
+    case "boomerang": {
+      updateBoomTabUI();
+      switch (state.activeBoomTab) {
+        case "summary": renderSummary(tabTsBoomDD); break;
+        case "A": renderChartA(tabBoomDD); break;
+        case "unassigned": renderUnassignedBoomerangs(); break;
+        case "dup": renderChartDup(tabBoom, heartbeats); break;
+        case "B": renderChartB(tabBoomDD); break;
+        case "C": renderChartC(tabTsBoomDD); break;
+        case "D": renderChartD(tabBoomDD); break;
+        case "E": renderChartE(tabBoomDD); break;
+        case "F": renderChartF(tabTsBoomDD); break;
+      }
+      break;
+    }
+    case "gateway": {
+      updateGwTabUI();
+      switch (state.activeGwTab) {
+        case "voltage": renderChartG(tsAll, tsAllDD); break;
+        case "state":   renderChartH(tsAllDD); break;
+      }
+      break;
+    }
+    case "map":      renderMap(all); renderGps(all); break;
+    case "overview": renderOverview(all); break;
+    case "rssi":     renderRssi(all); renderGps(all); break;
+    case "gps":      renderGps(all); break;
+    case "timeline": renderTimeline(all); break;
+    case "wagon":    renderWagonPage(all); break;
+  }
+  renderWagonWidget(all);
+}
+
+// ---------- Wagon ----------
+function renderWagonPage(all) {
+  paintWagonDots("wagonPageImg");
+  const boom = all.filter(r => r.sensor_key);
+  const byId = groupBy(boom, r => r.sensor_key);
+  // Only list sensor IDs that have data inside the current from/to window.
+  const inWindow = distinctSensorIdsInWindow();
+  const wrapHost = document.getElementById("wagonDiagramWrap");
+  wrapHost.querySelectorAll(".wagon-slot").forEach(s => s.remove());
+
+  for (const pos of WAGON_POSITIONS) {
+    const wrap = document.createElement("div");
+    wrap.className = "wagon-slot";
+    wrap.style.gridColumn = pos.startsWith("L") ? "1" : "3";
+    wrap.style.gridRow = pos[1];
+    const label = document.createElement("div");
+    label.className = "wagon-slot-label";
+    label.textContent = `${pos} · ${WAGON_LABELS[pos]}`;
+    const takenByOthers = new Set();
+    for (const p of WAGON_POSITIONS)
+      if (p !== pos && state.wagonMap[p]) takenByOthers.add(state.wagonMap[p]);
+    const currentId = state.wagonMap[pos];
+    const optionIds = [];
+    if (currentId) optionIds.push(currentId); // keep current even if out-of-window
+    for (const id of inWindow)
+      if (id !== currentId && !takenByOthers.has(id)) optionIds.push(id);
+    const select = document.createElement("select");
+    select.innerHTML = `<option value="">— unassigned —</option>` +
+      optionIds.map(id =>
+        `<option value="${id}" ${currentId === id ? "selected" : ""}>${id}</option>`
+      ).join("");
+    select.addEventListener("change", () => {
+      state.wagonMap[pos] = select.value || null;
+      renderWagonPage(all);
+      renderWagonWidget(all);
+    });
+    wrap.append(label, select);
+    if (currentId) {
+      const rows = byId.get(currentId) || [];
+      const unique = dedupeBoom(rows).length;
+      const dup = rows.length - unique;
+      const stat = document.createElement("div");
+      stat.className = "wagon-slot-stat";
+      stat.innerHTML =
+        `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${state.sensorColor[currentId] || '#888'};margin-right:4px;vertical-align:middle"></span>` +
+        `${unique.toLocaleString()} unique · ${dup.toLocaleString()} dup`;
+      wrap.append(stat);
+    }
+    wrapHost.append(wrap);
+  }
+}
+
+function paintWagonDots(hostId) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  for (const pos of WAGON_POSITIONS) {
+    const dot = host.querySelector(`.wheel-dot[data-pos="${pos}"]`);
+    if (!dot) continue;
+    const id = state.wagonMap[pos];
+    if (id && state.sensorColor[id]) {
+      dot.style.background = state.sensorColor[id];
+      dot.classList.add("assigned");
+    } else {
+      dot.style.background = "";
+      dot.classList.remove("assigned");
+    }
+  }
+}
+
+function renderWagonWidget(all) {
+  paintWagonDots("wagonWidgetImg");
+  const mapHost = document.getElementById("wagonWidgetMap");
+  if (!mapHost) return;
+  mapHost.innerHTML = WAGON_POSITIONS.map(pos => {
+    const id = state.wagonMap[pos];
+    const swatch = `<span class="swatch" style="${id && state.sensorColor[id] ? `background:${state.sensorColor[id]}` : ''}"></span>`;
+    const val = id ? id : "—";
+    return `<span class="${id ? 'assigned' : ''}">${swatch}${pos}: ${val}</span>`;
+  }).join("");
+}
+
+// ---------- Stats helper ----------
+function computeStats(vals) {
+  if (!vals.length) return { n: 0, min: null, max: null, mean: null, median: null, std: null };
+  const sorted = [...vals].sort((a,b) => a-b);
+  const mean = sorted.reduce((a,b)=>a+b,0) / sorted.length;
+  const median = sorted[Math.floor(sorted.length/2)];
+  const std = sorted.length > 1 ? Math.sqrt(sorted.reduce((s,v)=>s+(v-mean)**2,0)/sorted.length) : 0;
+  return { n: sorted.length, min: sorted[0], max: sorted[sorted.length-1], mean, median, std };
+}
+
+// ---------- RSSI ----------
+function renderRssi(all) {
+  const rssiAll = all.map(r => r.CellScan_rssi);
+  const sentinels = rssiAll.filter(v => v === -255).length;
+  const empty     = rssiAll.filter(v => v == null).length;
+  const valid     = rssiAll.filter(v => v != null && v !== -255 && v !== 0);
+  const s = computeStats(valid);
+
+  document.getElementById("rssiStats").innerHTML = `
+    <div class="ov-stat"><div class="k">Valid readings</div><div class="v">${valid.length.toLocaleString()}</div><div class="s">Excl. sentinel & empty</div></div>
+    <div class="ov-stat"><div class="k">Sentinel (-255)</div><div class="v">${sentinels.toLocaleString()}</div><div class="s">No signal / sensor error</div></div>
+    <div class="ov-stat"><div class="k">Empty</div><div class="v">${empty.toLocaleString()}</div><div class="s">No RSSI reported</div></div>
+    <div class="ov-stat"><div class="k">Min</div><div class="v">${fmt(s.min, 0)} dBm</div></div>
+    <div class="ov-stat"><div class="k">Max</div><div class="v">${fmt(s.max, 0)} dBm</div></div>
+    <div class="ov-stat"><div class="k">Mean</div><div class="v">${fmt(s.mean, 1)} dBm</div></div>
+    <div class="ov-stat"><div class="k">Median</div><div class="v">${fmt(s.median, 0)} dBm</div></div>
+    <div class="ov-stat"><div class="k">Std deviation</div><div class="v">${fmt(s.std, 1)}</div></div>`;
+
+  // By movement state
+  const stateDefs = [
+    ["Moving",     r => r.gateway_state === "currently_moving"],
+    ["Parked",     r => r.gateway_state === "currently_parked"],
+    ["Transition", r => r.gateway_state === "was_parked_now_moving" || r.gateway_state === "was_moving_now_parked"],
+  ];
+  const byStateRows = stateDefs.map(([label, pred]) => {
+    const vs = all.filter(pred).map(r => r.CellScan_rssi).filter(v => v != null && v !== -255 && v !== 0);
+    const st = computeStats(vs);
+    return `<tr>
+      <td>${label}</td>
+      <td>${vs.length.toLocaleString()}</td>
+      <td>${fmt(st.min, 0)}</td>
+      <td>${fmt(st.mean, 1)}</td>
+      <td>${fmt(st.median, 0)}</td>
+      <td>${fmt(st.max, 0)}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("rssiByState").innerHTML =
+    `<thead><tr><th>State</th><th>Count</th><th>Min</th><th>Mean</th><th>Median</th><th>Max</th></tr></thead>
+     <tbody>${byStateRows}</tbody>`;
+
+  // Signal strength distribution
+  const buckets = [
+    { label: "≤ -120",       q: "Very Weak",  color: "#E15759" },
+    { label: "-120 to -110", q: "Weak",       color: "#F28E2B" },
+    { label: "-110 to -100", q: "Fair",       color: "#EDC948" },
+    { label: "-100 to -90",  q: "Good",       color: "#59A14F" },
+    { label: "-90 to -80",   q: "Good",       color: "#76B7B2" },
+    { label: "-80 to -70",   q: "Strong",     color: "#4E79A7" },
+    { label: "> -70",        q: "Excellent",  color: "#B07AA1" },
+  ];
+  const bucketIdx = v =>
+    v <= -120 ? 0 : v <= -110 ? 1 : v <= -100 ? 2 : v <= -90 ? 3 : v <= -80 ? 4 : v <= -70 ? 5 : 6;
+  const counts = new Array(buckets.length).fill(0);
+  for (const v of valid) counts[bucketIdx(v)]++;
+  const tot = valid.length;
+
+	  upsertChart("chartRssiDist", {
+	    type: "bar",
+	    data: {
+	      labels: buckets.map(b => b.label),
+	      datasets: [{ data: counts, backgroundColor: buckets.map(b => b.color) }],
+	    },
+	    options: { ...baseOpts(), plugins: { legend: { display: false }, tooltip: tooltipOpts() },
+	      scales: { x: catAxis("dBm"), y: countAxis("count") } },
+	  });
+  document.getElementById("rssiDistTable").innerHTML =
+    `<thead><tr><th>Range</th><th>Count</th><th>% of total</th><th>Quality</th></tr></thead>
+     <tbody>${buckets.map((b, i) =>
+       `<tr><td>${b.label} dBm</td>
+            <td>${counts[i].toLocaleString()}</td>
+            <td>${tot ? (counts[i]/tot*100).toFixed(1) : "0.0"}%</td>
+            <td><span class="muted">${b.q}</span></td></tr>`).join("")}</tbody>`;
+
+  // RSSI is a gateway cellular metric; show the locations/times of strongest and weakest readings.
+  const rssiEvents = all
+    .filter(r => r.ts_valid && r.CellScan_rssi != null && r.CellScan_rssi !== -255 && r.CellScan_rssi !== 0)
+    .map(r => ({
+      ts: r.ts,
+      rssi: r.CellScan_rssi,
+      lat: r.lat,
+      lon: r.lon,
+      state: r.gateway_state || "—",
+      tower: r.CellScan_cid != null ? `${r.CellScan_mcc ?? "—"}-${r.CellScan_mnc ?? "—"}-${r.CellScan_las ?? "—"}-${r.CellScan_cid}` : "—",
+    }));
+  const gpsLink = r => locationLink(r.lat, r.lon);
+  const eventRow = r => `<tr>
+    <td>${fmt(r.rssi, 0)}</td>
+    <td>${fmtDateTz(r.ts, state.tz, true)}</td>
+    <td>${r.state}</td>
+    <td>${r.tower}</td>
+    <td>${gpsLink(r)}</td>
+  </tr>`;
+  const eventTable = rows => `<thead><tr><th>RSSI</th><th>Date & time</th><th>State</th><th>Cell tower</th><th>GPS location</th></tr></thead>
+    <tbody>${rows.length ? rows.map(eventRow).join("") : `<tr><td colspan="5" class="muted">No valid RSSI readings</td></tr>`}</tbody>`;
+  document.getElementById("rssiWorstTable").innerHTML =
+    eventTable([...rssiEvents].sort((a,b) => a.rssi - b.rssi || a.ts - b.ts).slice(0, 10));
+  document.getElementById("rssiBestTable").innerHTML =
+    eventTable([...rssiEvents].sort((a,b) => b.rssi - a.rssi || a.ts - b.ts).slice(0, 10));
+}
+
+// ---------- Timeline (daily) ----------
+function renderTimeline(all) {
+  const host = document.getElementById("timelineTable");
+  const tsAll = all.filter(r => r.ts_valid);
+  if (!tsAll.length) {
+    host.innerHTML = '<thead><tr><th>Date</th></tr></thead><tbody><tr><td class="muted">No valid-timestamp data in window</td></tr></tbody>';
+    return;
+  }
+  // Group by day in selected TZ
+  const byDay = new Map();
+  for (const r of tsAll) {
+    const d = dayKeyTz(r.ts, state.tz);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(r);
+  }
+  const days = Array.from(byDay.keys()).sort();
+  const voltageStats = vals => {
+    const xs = vals.filter(v => v != null);
+    return xs.length
+      ? { min: Math.min(...xs), avg: xs.reduce((a,b)=>a+b,0)/xs.length, max: Math.max(...xs) }
+      : null;
+  };
+  const rows = days.map(day => {
+    const recs = byDay.get(day);
+    const total = recs.length;
+    const boom = recs.filter(r => r.sensor_key).length;
+    const moving = recs.filter(r => r.gateway_state === "currently_moving").length;
+    const parked = recs.filter(r => r.gateway_state === "currently_parked").length;
+	    const transition = recs.filter(r =>
+	      r.gateway_state === "was_parked_now_moving" || r.gateway_state === "was_moving_now_parked").length;
+	    const validRssi = recs.map(r => r.CellScan_rssi).filter(v => v != null && v !== -255 && v !== 0);
+	    const minRssi = validRssi.length ? Math.min(...validRssi) : null;
+	    const maxRssi = validRssi.length ? Math.max(...validRssi) : null;
+	    const gpsAnyFixPct = total ? recs.filter(r => r.GPSScan_fix_type != null).length / total : 0;
+    const activeBooms = new Set(recs.filter(r => r.sensor_key).map(r => r.sensor_key)).size;
+    const battStats = voltageStats(recs.map(r => r.battery_V));
+    const solarStats = voltageStats(recs.map(r => r.solar_V));
+    const detailRows = recs.slice().sort((a,b) => a.ts - b.ts).map((r, i) => timelineDetailRow(r, i)).join("");
+	    return { day, total, boom, moving, parked, transition,
+	      boomPct: total ? boom/total : 0, minRssi, maxRssi, gpsAnyFixPct, activeBooms, battStats, solarStats, detailRows };
+	  });
+
+  // Totals / overall averages computed from the raw pool
+  const totTotal = tsAll.length;
+  const totBoom = tsAll.filter(r => r.sensor_key).length;
+  const totMoving = tsAll.filter(r => r.gateway_state === "currently_moving").length;
+  const totParked = tsAll.filter(r => r.gateway_state === "currently_parked").length;
+	  const totTransition = tsAll.filter(r =>
+	    r.gateway_state === "was_parked_now_moving" || r.gateway_state === "was_moving_now_parked").length;
+	  const allRssi = tsAll.map(r => r.CellScan_rssi).filter(v => v != null && v !== -255 && v !== 0);
+	  const totMinRssi = allRssi.length ? Math.min(...allRssi) : null;
+	  const totMaxRssi = allRssi.length ? Math.max(...allRssi) : null;
+  const totGpsAnyFix = totTotal ? tsAll.filter(r => r.GPSScan_fix_type != null).length / totTotal : 0;
+  const totActiveBooms = new Set(tsAll.filter(r => r.sensor_key).map(r => r.sensor_key)).size;
+  const totBattStats = voltageStats(tsAll.map(r => r.battery_V));
+  const totSolarStats = voltageStats(tsAll.map(r => r.solar_V));
+
+  host.innerHTML = `
+    <thead>
+      <tr>
+	        <th>Date</th><th>Boomerang / total</th><th>Boom %</th><th>Active booms</th>
+	        <th>Moving</th><th>Parked</th><th>Transition</th>
+	        <th>RSSI min/max</th><th>GPS any fix %</th><th>Battery min/avg/max</th><th>Solar min/avg/max</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(r => `<tr class="timeline-summary-row" data-timeline-summary="${r.day}">
+        <td><button class="timeline-date-btn" type="button" data-timeline-button="${r.day}">${r.day}</button></td>
+        <td>${r.boom.toLocaleString()} / ${r.total.toLocaleString()}</td>
+	        <td>${(r.boomPct*100).toFixed(1)}%</td>
+        <td>${r.activeBooms}</td>
+        <td>${r.moving.toLocaleString()}</td>
+	        <td>${r.parked.toLocaleString()}</td>
+	        <td>${r.transition.toLocaleString()}</td>
+	        <td>${fmtRssiPair(r.minRssi, r.maxRssi)}</td>
+	        <td>${(r.gpsAnyFixPct*100).toFixed(1)}%</td>
+        <td>${fmtVoltageStats(r.battStats, "battery")}</td>
+        <td>${fmtVoltageStats(r.solarStats, "solar")}</td>
+      </tr>
+      <tr class="timeline-detail-row" data-timeline-detail="${r.day}">
+        <td class="timeline-detail-cell" colspan="11">
+          <div class="timeline-detail-wrap">
+            <table class="dup-table compact timeline-detail-table">
+              <thead><tr>
+                <th>#</th><th>Date & time</th><th>Type</th><th>Boomerang</th><th>State</th>
+                <th>RSSI</th><th>GPS fix</th><th>Battery V</th><th>Solar V</th>
+              </tr></thead>
+              <tbody>${r.detailRows}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`).join("")}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>TOTAL / AVG</td>
+        <td>${totBoom.toLocaleString()} / ${totTotal.toLocaleString()}</td>
+	        <td>${totTotal ? (totBoom/totTotal*100).toFixed(1) + "%" : "—"}</td>
+        <td>${totActiveBooms}</td>
+        <td>${totMoving.toLocaleString()}</td>
+	        <td>${totParked.toLocaleString()}</td>
+	        <td>${totTransition.toLocaleString()}</td>
+	        <td>${fmtRssiPair(totMinRssi, totMaxRssi)}</td>
+	        <td>${(totGpsAnyFix*100).toFixed(1)}%</td>
+        <td>${fmtVoltageStats(totBattStats, "battery")}</td>
+        <td>${fmtVoltageStats(totSolarStats, "solar")}</td>
+      </tr>
+    </tfoot>`;
+
+  host.querySelector("tbody")?.addEventListener("click", e => {
+    const row = e.target.closest("[data-timeline-summary]");
+    if (!row) return;
+    toggleTimelineDay(row.dataset.timelineSummary);
+  });
+
+}
+
+function toggleTimelineDay(day) {
+  const detail = document.querySelector(`[data-timeline-detail="${day}"]`);
+  if (!detail) return;
+  const open = detail.classList.toggle("open");
+  const btn = document.querySelector(`[data-timeline-button="${day}"]`);
+  if (btn) btn.classList.toggle("open", open);
+}
+
+// ---------- GPS & Connectivity ----------
+function renderGps(all) {
+  const tot = all.length;
+
+  // Fix quality
+  const fixCounts = { "3": 0, "2": 0, "0": 0, "other": 0, "null": 0 };
+  for (const r of all) {
+    if (r.GPSScan_fix_type == null) fixCounts.null++;
+    else if ([0,2,3].includes(r.GPSScan_fix_type)) fixCounts[String(r.GPSScan_fix_type)]++;
+    else fixCounts.other++;
+  }
+  const fixRows = [
+    ["Fix 3 (3D)",  fixCounts["3"],   "Full 3D fix (lat/lon/elev)"],
+    ["Fix 2 (2D)",  fixCounts["2"],   "2D fix (lat/lon only)"],
+    ["Fix 0",       fixCounts["0"],   "No satellite fix"],
+    ...(fixCounts.other ? [["Other fix",  fixCounts.other, "Other fix code"]] : []),
+    ["No Data",     fixCounts.null,   "GPS data not reported"],
+  ];
+  const gpsFixHtml =
+    `<thead><tr><th>Fix type</th><th>Count</th><th>% of total</th><th>Description</th></tr></thead>
+     <tbody>${fixRows.map(([n, c, d]) =>
+       `<tr><td>${n}</td><td>${c.toLocaleString()}</td>
+            <td>${tot ? (c/tot*100).toFixed(1) + "%" : "—"}</td>
+            <td><span class="muted">${d}</span></td></tr>`).join("")}
+       <tr><td><b>Total</b></td><td><b>${tot.toLocaleString()}</b></td><td><b>100.0%</b></td><td></td></tr>
+     </tbody>`;
+  setHtml("gpsFixTable", gpsFixHtml);
+  setHtml("mapGpsFixTable", gpsFixHtml);
+
+  // Coverage
+  const coords = all.filter(r => r.lat != null && r.lon != null
+    && r.lat !== 0 && r.lon !== 0
+    && Math.abs(r.lat) <= 90 && Math.abs(r.lon) <= 180);
+  const cov = [];
+  cov.push(["Valid coordinates",
+    `${coords.length.toLocaleString()} / ${tot.toLocaleString()} (${tot ? (coords.length/tot*100).toFixed(1) : "0.0"}%)`]);
+  if (coords.length) {
+    const lats = coords.map(r => r.lat), lons = coords.map(r => r.lon);
+    const latMin = Math.min(...lats), latMax = Math.max(...lats);
+    const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
+    const latKm = (latMax - latMin) * 111;
+    const lonKm = (lonMax - lonMin) * 111 * Math.cos(((latMin+latMax)/2) * Math.PI/180);
+    cov.push(["Latitude range",
+      `${latMin.toFixed(3)}° — ${latMax.toFixed(3)}° · ~${latKm.toFixed(0)} km span`]);
+    cov.push(["Longitude range",
+      `${lonMin.toFixed(3)}° — ${lonMax.toFixed(3)}° · ~${lonKm.toFixed(0)} km span`]);
+  } else {
+    cov.push(["Latitude range", "—"]);
+    cov.push(["Longitude range", "—"]);
+  }
+  const elevs = all.map(r => r.GPSScan_elevation_cm).filter(v => v != null && v !== 0);
+  if (elevs.length) {
+    const eMin = Math.min(...elevs) / 100, eMax = Math.max(...elevs) / 100;
+    const eAvg = elevs.reduce((a,b)=>a+b,0) / elevs.length / 100;
+    cov.push(["Elevation range", `${eMin.toFixed(0)} — ${eMax.toFixed(0)} m · avg ${eAvg.toFixed(0)} m`]);
+  } else {
+    cov.push(["Elevation range", "—"]);
+  }
+  const speeds = all.map(r => r.GPSScan_velocity_kmh).filter(v => v != null);
+  if (speeds.length) {
+    cov.push(["Max speed", `${Math.max(...speeds).toLocaleString()} km/h`]);
+  }
+  setOvRows("gpsCoverage", cov);
+  setOvRows("mapGpsCoverage", cov);
+
+  // Cellular operators
+  const opCounts = new Map();
+  for (const r of all) {
+    if (r.CellScan_mcc != null) {
+      const key = `${r.CellScan_mcc}-${r.CellScan_mnc}`;
+      opCounts.set(key, (opCounts.get(key) || 0) + 1);
+    }
+  }
+  const opRows = Array.from(opCounts.entries()).sort((a,b) => b[1] - a[1]);
+  const opTot = opRows.reduce((s, [, v]) => s + v, 0);
+  const cellOpHtml =
+    `<thead><tr><th>MCC-MNC</th><th>Records</th><th>% share</th></tr></thead>
+     <tbody>${opRows.length ? opRows.map(([k, v]) =>
+       `<tr><td>${k}</td><td>${v.toLocaleString()}</td>
+            <td>${opTot ? (v/opTot*100).toFixed(1) + "%" : "—"}</td></tr>`).join("") :
+       `<tr><td colspan="3" class="muted">No cellular data</td></tr>`}</tbody>`;
+  setHtml("cellOpTable", cellOpHtml);
+  setHtml("connCellOpTable", cellOpHtml);
+
+  // Cell tower statistics
+  const towers = new Set();
+  let handovers = 0, lastCid = null;
+  const sortedCid = all.filter(r => r.ts_valid && r.CellScan_cid != null)
+                       .sort((a, b) => a.ts - b.ts);
+  for (const r of sortedCid) {
+    if (lastCid != null && r.CellScan_cid !== lastCid) handovers++;
+    lastCid = r.CellScan_cid;
+  }
+  for (const r of all) {
+    if (r.CellScan_cid != null)
+      towers.add(`${r.CellScan_mcc}|${r.CellScan_mnc}|${r.CellScan_las}|${r.CellScan_cid}`);
+  }
+  const tsArr = all.filter(r => r.ts_valid).map(r => r.ts.getTime());
+  const days = tsArr.length ? (Math.max(...tsArr) - Math.min(...tsArr)) / (1000*60*60*24) : 0;
+  const cellTowerRows = [
+    ["Unique towers (CID)", towers.size.toLocaleString()],
+    ["Tower handovers",     handovers.toLocaleString()],
+    ["Avg handovers/day",   days > 0 ? (handovers / days).toFixed(1) : "—"],
+    ["Test duration",       days > 0 ? `${days.toFixed(1)} days` : "—"],
+  ];
+  setOvRows("cellTowerStats", cellTowerRows);
+  setOvRows("connCellTowerStats", cellTowerRows);
+
+  // Top 10 towers
+  const towerCounts = new Map();
+  const towerLocations = new Map();
+  for (const r of all) {
+    if (r.CellScan_cid != null) {
+      const k = `${r.CellScan_mcc}-${r.CellScan_mnc}-${r.CellScan_las}-${r.CellScan_cid}`;
+      towerCounts.set(k, (towerCounts.get(k) || 0) + 1);
+      if (!towerLocations.has(k) && r.lat != null && r.lon != null && r.lat !== 0 && r.lon !== 0) {
+        towerLocations.set(k, { lat: r.lat, lon: r.lon });
+      }
+    }
+  }
+  const top10 = Array.from(towerCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const towerTotal = Array.from(towerCounts.values()).reduce((s, v) => s + v, 0);
+  const cellTop10Html =
+    `<thead><tr><th>MCC-MNC-LAC-CID</th><th>Records</th><th>% of total</th><th>GPS location</th></tr></thead>
+     <tbody>${top10.length ? top10.map(([k, v]) =>
+       `<tr><td>${k}</td><td>${v.toLocaleString()}</td>
+            <td>${towerTotal ? (v/towerTotal*100).toFixed(1) + "%" : "—"}</td>
+            <td>${locationLink(towerLocations.get(k)?.lat, towerLocations.get(k)?.lon)}</td></tr>`).join("") :
+       `<tr><td colspan="4" class="muted">No cellular data</td></tr>`}</tbody>`;
+  setHtml("cellTop10", cellTop10Html);
+  setHtml("connCellTop10", cellTop10Html);
+}
+
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function locationLink(lat, lon) {
+  if (lat == null || lon == null) return "—";
+  const coords = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const href = `https://www.google.com/maps?q=${lat},${lon}`;
+  return `<a class="map-link" href="${href}" target="_blank" rel="noopener noreferrer">${coords}</a>`;
+}
+
+// ---------- Overview ----------
+function renderOverview(all) {
+  const boom = all.filter(r => r.sensor_key);
+  const boomDD = dedupeBoom(boom);
+  const heartbeats = all.filter(r => !r.sensor_key);
+  const tsAll = all.filter(r => r.ts_valid);
+
+  const imei = all.length ? all[0].gateway_id : "—";
+  const tsArr = tsAll.map(r => r.ts.getTime());
+  const tMin = tsArr.length ? new Date(Math.min(...tsArr)) : null;
+  const tMax = tsArr.length ? new Date(Math.max(...tsArr)) : null;
+  const durationDays = (tMin && tMax) ? (tMax - tMin) / (1000*60*60*24) : null;
+  const devices = new Set(boom.map(r => r.sensor_key)).size;
+
+  const heartbeatsDD = dedupeGw(heartbeats);
+  const boomDupCount = boom.length - boomDD.length;
+  const heartbeatDupCount = heartbeats.length - heartbeatsDD.length;
+  const duplicatedPackets = boomDupCount + heartbeatDupCount;
+  const allDD = [...boomDD, ...heartbeatsDD];
+  const unTot = (u, m) => `${u.toLocaleString()} / ${m.toLocaleString()}`;
+
+  setOvRows("ovTest", [
+    ["Gateway IMEI",        imei],
+    ["Test start",          tMin ? fmtDateTz(tMin, state.tz, true) : "—"],
+    ["Test end",            tMax ? fmtDateTz(tMax, state.tz, true) : "—"],
+    ["Duration (days)",     durationDays != null ? durationDays.toFixed(2) : "—"],
+    ["Heartbeat packets",   unTot(heartbeatsDD.length, heartbeats.length)],
+    ["Boomerang packets",   unTot(boomDD.length, boom.length)],
+    ["Duplicated packets",  duplicatedPackets.toLocaleString(),   "dups"],
+    ["Total records",       unTot(allDD.length, all.length)],
+    ["Boomerang devices",   devices.toLocaleString()],
+  ]);
+
+  // Gateway performance = heartbeat-only gateway packets, excluding Boomerang readings.
+  const heartbeatTs = heartbeats.filter(r => r.ts_valid);
+  const heartbeatOnlyDD = dedupeGw(heartbeatTs);
+  const heartbeatOnlyDupCount = heartbeatTs.length - heartbeatOnlyDD.length;
+  const heartbeatOnlyDupRate = heartbeatTs.length ? heartbeatOnlyDupCount / heartbeatTs.length : 0;
+  const gatewaySorted = [...heartbeatOnlyDD].sort((a,b) => a.ts - b.ts);
+  const gatewayGaps = [];
+  for (let i = 1; i < gatewaySorted.length; i++) gatewayGaps.push(gatewaySorted[i].ts - gatewaySorted[i-1].ts);
+  gatewayGaps.sort((a,b) => a-b);
+  const gatewayMedianGap = gatewayGaps.length ? gatewayGaps[Math.floor(gatewayGaps.length/2)] : null;
+  const gatewayOver30 = gatewayGaps.length ? gatewayGaps.filter(g => g > 30*60*1000).length / gatewayGaps.length : 0;
+  const gatewayRate = durationDays && durationDays > 0 ? heartbeatOnlyDD.length / durationDays : null;
+  const gatewayActiveDays = heartbeatOnlyDD.length ? new Set(heartbeatOnlyDD.map(r => dayKeyTz(r.ts, state.tz))).size : 0;
+  const latestGateway = gatewaySorted.length ? gatewaySorted[gatewaySorted.length - 1] : null;
+  setOvRows("ovGwPerf", [
+    ["Unique heartbeat packets",     heartbeatOnlyDD.length.toLocaleString(), "unique"],
+    ["Duplicated heartbeat packets", heartbeatOnlyDupCount.toLocaleString(),   "dups"],
+    ["Heartbeat duplicate rate",      `${(heartbeatOnlyDupRate*100).toFixed(1)}%`, "dups"],
+    ["Avg heartbeat rate",            gatewayRate != null ? `~${gatewayRate.toFixed(1)} records/day` : "—", "unique"],
+    ["Active reporting days",       gatewayActiveDays.toLocaleString(), "unique"],
+    ["Median heartbeat gap",        fmtDuration(gatewayMedianGap), "unique"],
+    ["Heartbeat gaps >30 min",      `${(gatewayOver30*100).toFixed(1)}%`, "unique"],
+    ["Latest heartbeat",            latestGateway ? fmtDateTz(latestGateway.ts, state.tz, true) : "—"],
+  ]);
+
+  // Boomerang performance
+  const boomTotal = boom.length;
+  const boomUnique = boomDD.length;
+  const deliveryRatio = boomTotal ? boomUnique / boomTotal : 0;
+  const byId = groupBy(boomDD, r => r.sensor_key);
+  const rates = [], coverages = [];
+  const allDays = tsAll.length
+    ? new Set(tsAll.map(r => dayKeyTz(r.ts, state.tz))).size
+    : 0;
+  for (const rows of byId.values()) {
+    const rv = rows.filter(r => r.ts_valid);
+    if (!rv.length) continue;
+    const days = new Set(rv.map(r => dayKeyTz(r.ts, state.tz))).size;
+    rates.push(rv.length / Math.max(days, 1));
+    if (allDays > 0) coverages.push(days / allDays);
+  }
+  const avgActivity = rates.length ? rates.reduce((a,b)=>a+b,0) / rates.length : null;
+  const avgCoverage = coverages.length ? coverages.reduce((a,b)=>a+b,0) / coverages.length : null;
+
+  // Relay gaps (deduped)
+  const gaps = [];
+  for (const rows of byId.values()) {
+    const sorted = rows.filter(r => r.ts_valid).sort((a,b) => a.ts - b.ts);
+    for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i].ts - sorted[i-1].ts);
+  }
+  gaps.sort((a,b) => a-b);
+  const medianGap = gaps.length ? gaps[Math.floor(gaps.length/2)] : null;
+  const over30 = gaps.length ? gaps.filter(g => g > 30*60*1000).length / gaps.length : 0;
+
+  setOvRows("ovBoomPerf", [
+    ["Unique boomerang readings",     boomUnique.toLocaleString(),    "unique"],
+    ["Duplicated boomerang readings", boomDupCount.toLocaleString(),  "dups"],
+    ["Delivery ratio (dedup)",        `${(deliveryRatio*100).toFixed(1)}%`],
+    ["Avg activity rate",             avgActivity != null ? `~${avgActivity.toFixed(1)} readings/day/boom` : "—", "unique"],
+    ["Boomerang coverage",            avgCoverage != null ? `${(avgCoverage*100).toFixed(0)}%` : "—", "unique"],
+    ["Median relay gap",              fmtDuration(medianGap), "unique"],
+    ["Relay gaps >30 min",            `${(over30*100).toFixed(1)}%`, "unique"],
+  ]);
+
+  // Movement state
+  const sc = Object.fromEntries(STATE_LABELS.map(s => [s, 0]));
+  const scU = Object.fromEntries(STATE_LABELS.map(s => [s, 0]));
+  for (const r of all)   if (sc[r.gateway_state]  != null) sc[r.gateway_state]++;
+  for (const r of allDD) if (scU[r.gateway_state] != null) scU[r.gateway_state]++;
+  const pctMoving  = all.length   ? sc.currently_moving  / all.length   : 0;
+  const pctMovingU = allDD.length ? scU.currently_moving / allDD.length : 0;
+  setOvRows("ovState", [
+    ["Currently moving",      unTot(scU.currently_moving, sc.currently_moving)],
+    ["Currently parked",      unTot(scU.currently_parked, sc.currently_parked)],
+    ["Was parked → moving",   unTot(scU.was_parked_now_moving, sc.was_parked_now_moving)],
+    ["Was moving → parked",   unTot(scU.was_moving_now_parked, sc.was_moving_now_parked)],
+    ["% time moving",         `${(pctMovingU*100).toFixed(1)}% / ${(pctMoving*100).toFixed(1)}%`],
+  ]);
+
+  // Connectivity
+  const withFix = all.filter(r => r.GPSScan_fix_type != null);
+  const fix3    = withFix.filter(r => r.GPSScan_fix_type === 3).length;
+  const fix3Rate = withFix.length ? fix3 / withFix.length : 0;
+  const withFixU = allDD.filter(r => r.GPSScan_fix_type != null);
+  const fix3U    = withFixU.filter(r => r.GPSScan_fix_type === 3).length;
+  const fix3RateU = withFixU.length ? fix3U / withFixU.length : 0;
+  const validRssi = all.map(r => r.CellScan_rssi).filter(v => v != null && v !== -255 && v !== 0);
+  const avgRssi = validRssi.length ? validRssi.reduce((a,b)=>a+b,0)/validRssi.length : null;
+  const validRssiU = allDD.map(r => r.CellScan_rssi).filter(v => v != null && v !== -255 && v !== 0);
+  const avgRssiU = validRssiU.length ? validRssiU.reduce((a,b)=>a+b,0)/validRssiU.length : null;
+  const cells = new Set();
+  for (const r of all) {
+    if (r.CellScan_cid != null)
+      cells.add(`${r.CellScan_mcc}|${r.CellScan_mnc}|${r.CellScan_cid}|${r.CellScan_las}`);
+  }
+  const boomDupRate = boomTotal ? (boomTotal - boomUnique) / boomTotal : 0;
+  setOvRows("ovConn", [
+    ["GPS 3D fix rate",           `${(fix3RateU*100).toFixed(1)}% / ${(fix3Rate*100).toFixed(1)}%`],
+    ["Avg RSSI (excl. sentinel)",
+      `${avgRssiU != null ? avgRssiU.toFixed(1) : "—"} / ${avgRssi != null ? avgRssi.toFixed(1) : "—"} dBm`],
+    ["Unique cell towers",        cells.size.toLocaleString(),        "unique"],
+    ["Boomerang duplicate rate",  `${(boomDupRate*100).toFixed(1)}%`, "dups"],
+  ]);
+
+  // Gateway health table
+  const mmA = arr => arr.length ? { min: Math.min(...arr), avg: arr.reduce((a,b)=>a+b,0)/arr.length, max: Math.max(...arr) } : null;
+  const bat = mmA(tsAll.map(r => r.battery_V).filter(v => v != null));
+  const sol = mmA(tsAll.map(r => r.solar_V).filter(v => v != null));
+  const tmp = mmA(tsAll.map(r => r.system_temperature_celsius).filter(v => v != null));
+  const cell = (v, n) => v == null ? "—" : v.toFixed(n);
+  document.getElementById("ovHealth").innerHTML = `
+    <thead><tr><th>Metric</th><th>Min</th><th>Avg</th><th>Max</th></tr></thead>
+    <tbody>
+      <tr><td>Battery voltage (V)</td>
+          <td>${cell(bat && bat.min, 2)}</td><td>${cell(bat && bat.avg, 2)}</td><td>${cell(bat && bat.max, 2)}</td></tr>
+      <tr><td>Solar voltage (V)</td>
+          <td>${cell(sol && sol.min, 2)}</td><td>${cell(sol && sol.avg, 2)}</td><td>${cell(sol && sol.max, 2)}</td></tr>
+      <tr><td>System temperature (°C)</td>
+          <td>${cell(tmp && tmp.min, 1)}</td><td>${cell(tmp && tmp.avg, 1)}</td><td>${cell(tmp && tmp.max, 1)}</td></tr>
+    </tbody>`;
+}
+
+function setOvRows(hostId, rows) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = rows.map(r => {
+    const k = r[0], v = r[1], tag = r[2];
+    const tagHtml = tag ? ` <span class="ov-tag ${tag}">${tag}</span>` : "";
+    return `<div class="ov-row"><span class="k">${k}${tagHtml}</span><span class="v">${v}</span></div>`;
+  }).join("");
+}
+
+// ---------- Stats table helper ----------
+const sensorCol = {
+  label: "Sensor",
+  render: r => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${state.sensorColor[r.id] || '#888'};margin-right:6px;vertical-align:middle"></span>${r.id}`,
+};
+function renderStatsTable(hostId, columns, rows, footer) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = "";
+  if (!rows.length) {
+    host.innerHTML = '<div class="muted" style="font-size:12px; padding: 12px">No data</div>';
+    return;
+  }
+  const tbl = document.createElement("table");
+  tbl.className = "dup-table";
+  const th = `<thead><tr>${columns.map(c => `<th>${c.label}</th>`).join("")}</tr></thead>`;
+  const tb = `<tbody>${rows.map(r =>
+    `<tr>${columns.map(c => `<td>${c.render(r)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  const tf = footer ? `<tfoot><tr>${columns.map(c =>
+    `<td>${footer[c.label] != null ? footer[c.label] : ""}</td>`).join("")}</tr></tfoot>` : "";
+  tbl.innerHTML = th + tb + tf;
+  host.appendChild(tbl);
+}
+
+function assignedBoomerangIds() {
+  return new Set(Object.values(state.wagonMap).filter(Boolean).map(String));
+}
+
+function unassignedSensorIdsInWindow() {
+  const assigned = assignedBoomerangIds();
+  const counts = {};
+  for (const r of applyWindowStateFilter(state.rows)) {
+    if (!r.sensor_key || assigned.has(r.sensor_key)) continue;
+    counts[r.sensor_key] = (counts[r.sensor_key] || 0) + 1;
+  }
+  return Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+}
+
+function renderUnassignedBoomerangs() {
+  const scoped = applyWindowStateFilter(state.rows).filter(r => r.sensor_key);
+  const assigned = assignedBoomerangIds();
+  const assignedRows = scoped.filter(r => assigned.has(r.sensor_key));
+  const unassignedRows = scoped.filter(r => !assigned.has(r.sensor_key));
+  const unassignedDD = dedupeBoom(unassignedRows);
+  const unassignedIds = Array.from(new Set(unassignedRows.map(r => r.sensor_key)));
+  const dupCount = unassignedRows.length - unassignedDD.length;
+  const share = scoped.length ? unassignedRows.length / scoped.length : 0;
+  const topId = unassignedIds
+    .map(id => ({ id, n: unassignedRows.filter(r => r.sensor_key === id).length }))
+    .sort((a,b) => b.n - a.n)[0];
+
+  const statsHost = document.getElementById("unassignedStats");
+  if (statsHost) {
+    statsHost.innerHTML = `
+      <div class="ov-stat"><div class="k">Assigned transmissions</div><div class="v">${assignedRows.length.toLocaleString()}</div><div class="s">current wagon map</div></div>
+      <div class="ov-stat"><div class="k">Unassigned transmissions</div><div class="v">${unassignedRows.length.toLocaleString()}</div><div class="s">${(share*100).toFixed(1)}% of boomerang traffic</div></div>
+      <div class="ov-stat"><div class="k">Unassigned devices</div><div class="v">${unassignedIds.length.toLocaleString()}</div><div class="s">unique IDs in date window</div></div>
+      <div class="ov-stat"><div class="k">Duplicate unassigned</div><div class="v">${dupCount.toLocaleString()}</div><div class="s">raw minus de-duplicated</div></div>
+      <div class="ov-stat"><div class="k">Top unassigned ID</div><div class="v">${topId ? topId.id : "—"}</div><div class="s">${topId ? `${topId.n.toLocaleString()} transmissions` : "no unassigned traffic"}</div></div>`;
+  }
+
+  const visibleIds = new Set(state.unassignedSensorSelectionInitialized ? state.unassignedSensorSelection : unassignedIds);
+  const byId = groupBy(unassignedRows.filter(r => visibleIds.has(r.sensor_key)), r => r.sensor_key);
+  const rows = Array.from(byId.entries()).map(([id, rs]) => {
+    const ddrs = dedupeBoom(rs);
+    const ts = rs.filter(r => r.ts_valid).map(r => r.ts).sort((a,b) => a - b);
+    const days = new Set(rs.filter(r => r.ts_valid).map(r => dayKeyTz(r.ts, state.tz))).size;
+    return {
+      id,
+      samples: rs.length,
+      unique: ddrs.length,
+      duplicates: rs.length - ddrs.length,
+      share: scoped.length ? rs.length / scoped.length : 0,
+      first: ts[0] || null,
+      last: ts[ts.length - 1] || null,
+      reportsPerDay: days ? rs.length / days : null,
+      bTemp: avg(rs.map(r => r.BoomerangData_bearing_temp).filter(v => v != null)),
+      batt: avg(rs.map(r => r.boom_battery_V).filter(v => v != null)),
+      details: rs.slice().sort((a,b) => (a.ts_valid ? a.ts.getTime() : 0) - (b.ts_valid ? b.ts.getTime() : 0)),
+    };
+  }).sort((a,b) => b.samples - a.samples);
+
+  renderUnassignedTable(rows, {
+    samples: unassignedRows.length,
+    unique: unassignedDD.length,
+    duplicates: dupCount,
+    share,
+  });
+}
+
+function renderUnassignedTable(rows, totals) {
+  const host = document.getElementById("unassignedTableWrap");
+  if (!host) return;
+  if (!rows.length) {
+    host.innerHTML = '<div class="muted" style="font-size:12px; padding: 12px">No unassigned boomerang readings in this window</div>';
+    return;
+  }
+  const sensorCell = r =>
+    `<button class="unassigned-sensor-btn" type="button" data-unassigned-button="${r.id}">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${state.sensorColor[r.id] || '#888'};margin-right:6px;vertical-align:middle"></span>${r.id}
+    </button>`;
+  host.innerHTML = `
+    <table class="dup-table unassigned-table">
+      <thead><tr>
+        <th>Sensor</th><th>Samples</th><th>Dup / Uniq</th><th>% boom traffic</th>
+        <th>First seen</th><th>Last seen</th><th>Reports/day</th><th>Avg battery V</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr class="unassigned-summary-row" data-unassigned-summary="${r.id}">
+          <td>${sensorCell(r)}</td>
+          <td>${r.samples.toLocaleString()}</td>
+          <td>${r.duplicates.toLocaleString()} / ${r.unique.toLocaleString()}</td>
+          <td>${(r.share*100).toFixed(1)}%</td>
+          <td>${fmtDateStack(r.first)}</td>
+          <td>${fmtDateStack(r.last)}</td>
+          <td>${r.reportsPerDay != null ? r.reportsPerDay.toFixed(1) : "—"}</td>
+          <td>${fmt(r.batt, 2)}</td>
+        </tr>
+        <tr class="unassigned-detail-row" data-unassigned-detail="${r.id}">
+          <td class="unassigned-detail-cell" colspan="8">
+            <div class="unassigned-detail-wrap">
+              <table class="dup-table compact unassigned-detail-table">
+                <thead><tr>
+                  <th>#</th><th>Date & time</th><th>State</th><th>RSSI</th><th>Battery V</th>
+                  <th>Bearing °C</th><th>Boomerang °C</th><th>Accel long max</th><th>Accel vert max</th>
+                  <th>Accel lat max</th><th>ADXL max</th><th>Gateway battery V</th><th>Solar V</th>
+                </tr></thead>
+                <tbody>${r.details.map((d, i) => unassignedDetailRow(d, i)).join("")}</tbody>
+              </table>
+            </div>
+          </td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot><tr>
+        <td>total</td>
+        <td>${totals.samples.toLocaleString()}</td>
+        <td>${totals.duplicates.toLocaleString()} / ${totals.unique.toLocaleString()}</td>
+        <td>${(totals.share*100).toFixed(1)}%</td>
+        <td></td><td></td><td></td><td></td>
+      </tr></tfoot>
+    </table>`;
+
+  host.querySelector("tbody")?.addEventListener("click", e => {
+    const row = e.target.closest("[data-unassigned-summary]");
+    if (!row) return;
+    toggleUnassignedBoomerang(row.dataset.unassignedSummary);
+  });
+}
+
+function toggleUnassignedBoomerang(id) {
+  const detail = document.querySelector(`[data-unassigned-detail="${id}"]`);
+  if (!detail) return;
+  const open = detail.classList.toggle("open");
+  const btn = document.querySelector(`[data-unassigned-button="${id}"]`);
+  if (btn) btn.classList.toggle("open", open);
+}
+
+function unassignedDetailRow(r, idx) {
+  const rawRssi = (r.CellScan_rssi != null && r.CellScan_rssi !== -255 && r.CellScan_rssi !== 0) ? r.CellScan_rssi : null;
+  return `<tr>
+    <td>${idx + 1}</td>
+    <td>${fmtDateTz(r.ts, state.tz, true)}</td>
+    <td>${escapeHtml(r.gateway_state || "—")}</td>
+    <td>${fmtRssiValue(rawRssi)}</td>
+    <td>${fmtVoltageValue(r.boom_battery_V, "battery")}</td>
+    <td>${fmt(r.BoomerangData_bearing_temp, 1)}</td>
+    <td>${fmt(r.BoomerangData_boomerang_temp, 1)}</td>
+    <td>${fmt(r.BoomerangData_pcb_accel_long_max, 2)}</td>
+    <td>${fmt(r.BoomerangData_pcb_accel_vert_max, 2)}</td>
+    <td>${fmt(r.BoomerangData_pcb_accel_lat_max, 2)}</td>
+    <td>${fmt(r.BoomerangData_adxl_max, 2)}</td>
+    <td>${fmtVoltageValue(r.battery_V, "battery")}</td>
+    <td>${fmtVoltageValue(r.solar_V, "solar")}</td>
+  </tr>`;
+}
+
+function renderSummary(tsBoom) {
+  const sorted = [...tsBoom].sort((a,b) => a.ts - b.ts);
+  const series = [
+    { key: "BoomerangData_pcb_accel_long_max", label: "accel_long_max (g)",  color: "#4E79A7", axis: "y" },
+    { key: "BoomerangData_pcb_accel_vert_max", label: "accel_vert_max (g)",  color: "#76B7B2", axis: "y" },
+    { key: "BoomerangData_pcb_accel_lat_max",  label: "accel_lat_max (g)",   color: "#B07AA1", axis: "y" },
+    { key: "BoomerangData_pcb_accel_long_rms", label: "accel_long_rms (g)",  color: "#6E9BD1", axis: "y" },
+    { key: "BoomerangData_pcb_accel_vert_rms", label: "accel_vert_rms (g)",  color: "#499894", axis: "y" },
+    { key: "BoomerangData_pcb_accel_lat_rms",  label: "accel_lat_rms (g)",   color: "#D4A6C8", axis: "y" },
+    { key: "BoomerangData_adxl_max",           label: "adxl_max (g)",        color: "#EDC948", axis: "y" },
+    { key: "BoomerangData_adxl_rms",           label: "adxl_rms (g)",        color: "#59A14F", axis: "y" },
+    { key: "BoomerangData_bearing_temp",       label: "bearing_temp (°C)",   color: "#F28E2B", axis: "y1" },
+    { key: "BoomerangData_boomerang_temp",     label: "boomerang_temp (°C)", color: "#E15759", axis: "y1" },
+    { key: "boom_battery_V",                   label: "battery (V)",         color: "#9C755F", axis: "y1" },
+  ];
+  const datasets = series.map(s => {
+    const pts = sorted.filter(r => r[s.key] != null).map(r => ({ x: r.ts, y: r[s.key] }));
+    return {
+      label: s.label,
+      borderColor: s.color, backgroundColor: s.color,
+      data: pts, yAxisID: s.axis,
+      pointRadius: 0, borderWidth: 1.5, tension: 0.15,
+    };
+  }).filter(d => d.data.length);
+  const allTs = tsBoom.map(r => r.ts.getTime());
+  const tA = state.fromUtc ? state.fromUtc.getTime() : (allTs.length ? Math.min(...allTs) : undefined);
+  const tB = state.toUtc   ? state.toUtc.getTime()   : (allTs.length ? Math.max(...allTs) : undefined);
+  upsertChart("chartSummary", {
+    type: "line",
+    data: { datasets },
+    options: { ...baseOpts(), plugins: {
+        legend: {
+          ...legendOpts(),
+          onHover: (e) => { if (e.native) e.native.target.style.cursor = "pointer"; },
+          onLeave: (e) => { if (e.native) e.native.target.style.cursor = "default"; },
+        },
+        subtitle: {
+          display: true,
+          text: "click a series above to show or hide",
+          color: "#64748b",
+          font: { size: 11, style: "italic" },
+          padding: { top: 0, bottom: 8 },
+        },
+        tooltip: timeTooltipOpts(),
+      },
+      scales: {
+        x: { ...timeAxis(), min: tA, max: tB },
+        y:  { ...numAxis("accel (g)"), position: "left" },
+        y1: { ...numAxis("°C / V"), position: "right", grid: { drawOnChartArea: false } },
+      },
+    },
+  });
+
+  // Summary table: per-sensor aggregates
+  const ids = Array.from(tabSensorIds());
+  const tableRows = ids.map(id => {
+    const rs = tsBoom.filter(r => r.sensor_key === id);
+    const pick = k => rs.map(r => r[k]).filter(v => v != null);
+    return {
+      id,
+      samples: rs.length,
+      accLong: avg(pick("BoomerangData_pcb_accel_long_max")),
+      accVert: avg(pick("BoomerangData_pcb_accel_vert_max")),
+      accLat:  avg(pick("BoomerangData_pcb_accel_lat_max")),
+      adxl:    avg(pick("BoomerangData_adxl_max")),
+      bTemp:   avg(pick("BoomerangData_bearing_temp")),
+      battV:   avg(pick("boom_battery_V")),
+    };
+  }).sort((a,b) => b.samples - a.samples);
+  const totalRow = {
+    samples: tableRows.reduce((s, r) => s + r.samples, 0),
+  };
+  renderStatsTable("summaryTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "avg accel_long_max", render: r => fmt(r.accLong, 2) },
+    { label: "avg accel_vert_max", render: r => fmt(r.accVert, 2) },
+    { label: "avg accel_lat_max",  render: r => fmt(r.accLat, 2) },
+    { label: "avg adxl_max",       render: r => fmt(r.adxl, 2) },
+    { label: "avg bearing °C",     render: r => fmt(r.bTemp, 1) },
+    { label: "avg battery V",      render: r => fmt(r.battV, 2) },
+  ], tableRows, { "Sensor": "total", "Samples": totalRow.samples.toLocaleString() });
+}
+
+// ---------- Summary cards ----------
+function renderCards(all, boom) {
+  const cards = document.getElementById("cards");
+  const total = state.rows.length;
+  const shown = all.length;
+  const distinctSensors = new Set(boom.map(r => r.sensor_key)).size;
+  const gwId = state.rows.length ? state.rows[0].gateway_id : "—";
+
+  const boomShare = total ? Math.round(100 * state.rows.filter(r => r.sensor_key).length / total) : 0;
+  const gpsShare = total ? Math.round(100 * state.rows.filter(r => r.lat != null && r.lon != null).length / total) : 0;
+  const badTs = total ? Math.round(100 * state.rows.filter(r => !r.ts_valid).length / total) : 0;
+
+  const stateCounts = {}; STATE_LABELS.forEach(s => stateCounts[s] = 0);
+  all.forEach(r => { if (stateCounts[r.gateway_state] != null) stateCounts[r.gateway_state]++; });
+  const maxState = Math.max(1, ...Object.values(stateCounts));
+
+  const battVals = all.map(r => r.battery_V).filter(v => v != null);
+  const tempVals = all.map(r => r.system_temperature_celsius).filter(v => v != null);
+  const latest = all.filter(r => r.ts_valid).sort((a,b) => b.ts - a.ts)[0];
+
+  cards.innerHTML = "";
+  cards.appendChild(card("Gateway", `<div class="big" style="font-family:ui-monospace,Menlo,monospace;font-size:15px;word-break:break-all">${gwId}</div>
+    <div class="sub">showing ${shown.toLocaleString()} of ${total.toLocaleString()} rows</div>`));
+
+  cards.appendChild(card("Boomerang coverage", `<div class="big">${distinctSensors} / ${state.allSensorIds.length} sensors</div>
+    <div class="sub">${boom.length.toLocaleString()} Boomerang rows in view · ${boomShare}% of file</div>`));
+
+  const tRange = (state.tsMin && state.tsMax)
+    ? `${fmtDate(state.fromUtc || state.tsMin)}<br/>→ ${fmtDate(state.toUtc || state.tsMax)}`
+    : "no valid timestamps";
+  cards.appendChild(card("Time range (valid)", `<div class="big" style="font-size:14px">${tRange}</div>
+    <div class="sub">${state.validTsRows.length.toLocaleString()} of ${total.toLocaleString()} rows have good clock</div>`));
+
+  const bars = STATE_LABELS.map(s => `
+    <div class="rowbar"><span style="color:${STATE_COLORS[s]}">${s}</span>
+      <div class="bar"><div style="width:${100*stateCounts[s]/maxState}%;background:${STATE_COLORS[s]}"></div></div>
+      <span class="num">${stateCounts[s].toLocaleString()}</span></div>`).join("");
+  cards.appendChild(card("Gateway state breakdown", `<div class="rowbars">${bars}</div>`));
+
+  cards.appendChild(card("Battery voltage",
+    battVals.length
+      ? `<div class="big">${(latest && latest.battery_V != null ? latest.battery_V.toFixed(2) : "—")} V <span class="sub" style="font-size:12px">latest</span></div>
+         <div class="sub">min ${Math.min(...battVals).toFixed(2)} V · max ${Math.max(...battVals).toFixed(2)} V · avg ${avg(battVals).toFixed(2)} V</div>`
+      : `<div class="big">—</div>`
+  ));
+
+  cards.appendChild(card("System temperature",
+    tempVals.length
+      ? `<div class="big">${(latest ? latest.system_temperature_celsius : "—")} °C <span class="sub" style="font-size:12px">latest</span></div>
+         <div class="sub">min ${Math.min(...tempVals)} °C · max ${Math.max(...tempVals)} °C · avg ${avg(tempVals).toFixed(1)} °C</div>`
+      : `<div class="big">—</div>`
+  ));
+
+  cards.appendChild(card("Data quality", `
+    <div class="rowbars">
+      <div class="rowbar"><span>bad timestamps</span><div class="bar"><div style="width:${badTs}%;background:var(--bad)"></div></div><span class="num">${badTs}%</span></div>
+      <div class="rowbar"><span>missing GPS</span><div class="bar"><div style="width:${100-gpsShare}%;background:var(--warn)"></div></div><span class="num">${100-gpsShare}%</span></div>
+      <div class="rowbar"><span>missing Boomerang</span><div class="bar"><div style="width:${100-boomShare}%;background:var(--warn)"></div></div><span class="num">${100-boomShare}%</span></div>
+    </div>
+    <div class="sub">empty groups in file: GatewayImpact · StrainGaugeData · ValveData (status always LOCKED)</div>`));
+}
+function card(title, body) {
+  const d = document.createElement("div"); d.className = "card";
+  d.innerHTML = `<h3>${title}</h3>${body}`;
+  return d;
+}
+
+// ---------- Per-sensor table ----------
+function renderSensorTable(boom) {
+  const tbody = document.querySelector("#sensorsTable tbody");
+  tbody.innerHTML = "";
+  const byId = groupBy(boom, r => r.sensor_key);
+  const rows = Array.from(activeSensorIds()).map(id => {
+    const rs = byId.get(id) || [];
+    return {
+      id,
+      n: rs.length,
+      bearing: avg(rs.map(r => r.BoomerangData_bearing_temp).filter(v => v != null)),
+      battV: avg(rs.map(r => r.boom_battery_V).filter(v => v != null)),
+      longP95: pct(rs.map(r => r.BoomerangData_pcb_accel_long_max).filter(v => v != null), 95),
+      vertP95: pct(rs.map(r => r.BoomerangData_pcb_accel_vert_max).filter(v => v != null), 95),
+      latP95:  pct(rs.map(r => r.BoomerangData_pcb_accel_lat_max ).filter(v => v != null), 95),
+    };
+  }).sort((a,b) => b.n - a.n);
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${state.sensorColor[r.id]||'#888'};margin-right:6px;vertical-align:middle"></span>${r.id}</td>
+      <td>${r.n.toLocaleString()}</td>
+      <td>${fmt(r.bearing, 2)}</td>
+      <td>${fmt(r.battV, 2)}</td>
+      <td>${fmt(r.longP95, 2)}</td>
+      <td>${fmt(r.vertP95, 2)}</td>
+      <td>${fmt(r.latP95, 2)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// ---------- Charts ----------
+function upsertChart(id, config) {
+  if (state.charts[id]) state.charts[id].destroy();
+  const ctx = document.getElementById(id).getContext("2d");
+  state.charts[id] = new Chart(ctx, config);
+}
+
+function renderChartA(boom) {
+  const validTs = boom.filter(r => r.ts_valid);
+  if (!validTs.length) { upsertChart("chartA", emptyChart("no valid-timestamp data in window")); return; }
+  const tsArr = validTs.map(r => r.ts.getTime());
+  const tA = state.fromUtc ? state.fromUtc.getTime() : Math.min(...tsArr);
+  const tB = state.toUtc   ? state.toUtc.getTime()   : Math.max(...tsArr);
+  const N = 40;
+  const w = Math.max(1, (tB - tA) / N);
+  const ids = Array.from(tabSensorIds());
+  const perSensor = {};
+  for (const id of ids) {
+    perSensor[id] = Array.from({ length: N }, () => ({
+      count: 0,
+      gwTempSum: 0, gwTempN: 0,
+      bmTempSum: 0, bmTempN: 0,
+      gwBattSum: 0, gwBattN: 0,
+      bmBattSum: 0, bmBattN: 0,
+      solarSum: 0,  solarN: 0,
+    }));
+  }
+  let gwMin = Infinity, gwMax = -Infinity, bmMin = Infinity, bmMax = -Infinity;
+
+  for (const r of validTs) {
+    const idx = Math.min(N-1, Math.max(0, Math.floor((r.ts.getTime() - tA) / w)));
+    if (!r.sensor_key || !perSensor[r.sensor_key]) continue;
+    const b = perSensor[r.sensor_key][idx];
+    b.count++;
+    if (r.system_temperature_celsius != null) {
+      b.gwTempSum += r.system_temperature_celsius; b.gwTempN++;
+      if (r.system_temperature_celsius < gwMin) gwMin = r.system_temperature_celsius;
+      if (r.system_temperature_celsius > gwMax) gwMax = r.system_temperature_celsius;
+    }
+    if (r.BoomerangData_boomerang_temp != null) {
+      b.bmTempSum += r.BoomerangData_boomerang_temp; b.bmTempN++;
+      if (r.BoomerangData_boomerang_temp < bmMin) bmMin = r.BoomerangData_boomerang_temp;
+      if (r.BoomerangData_boomerang_temp > bmMax) bmMax = r.BoomerangData_boomerang_temp;
+    }
+    if (r.battery_V != null) { b.gwBattSum += r.battery_V; b.gwBattN++; }
+    if (r.boom_battery_V != null) { b.bmBattSum += r.boom_battery_V; b.bmBattN++; }
+    if (r.solar_V != null) { b.solarSum += r.solar_V; b.solarN++; }
+  }
+  const padRange = (mn, mx) => {
+    if (!Number.isFinite(mn) || !Number.isFinite(mx)) return { min: undefined, max: undefined };
+    const span = Math.max(1, mx - mn);
+    return { min: mn - span * 0.05, max: mx + span * 0.05 };
+  };
+  const gwRange = padRange(gwMin, gwMax);
+  const bmRange = padRange(bmMin, bmMax);
+  const step = N > 1 ? (tB - tA) / (N - 1) : 0;
+  const xAt = i => new Date(tA + i * step);
+  const avgOr = (sum, n) => n ? sum / n : null;
+
+  const datasets = ids.map(id => ({
+    label: id,
+    sensorId: id,
+    data: perSensor[id].map((b, i) => ({
+      x: xAt(i), y: b.count,
+      gwTemp: avgOr(b.gwTempSum, b.gwTempN),
+      bmTemp: avgOr(b.bmTempSum, b.bmTempN),
+      gwBatt: avgOr(b.gwBattSum, b.gwBattN),
+      bmBatt: avgOr(b.bmBattSum, b.bmBattN),
+      solar:  avgOr(b.solarSum,  b.solarN),
+    })),
+    borderColor: state.sensorColor[id], backgroundColor: state.sensorColor[id],
+    pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.2, yAxisID: "y",
+  }));
+
+  // Faint dashed reference lines bound to the right-side axes.
+  const gwLine = Array.from({ length: N }, (_, i) => {
+    let s = 0, n = 0;
+    for (const id of ids) { s += perSensor[id][i].gwTempSum; n += perSensor[id][i].gwTempN; }
+    return n ? s / n : null;
+  });
+  const bmLine = Array.from({ length: N }, (_, i) => {
+    let s = 0, n = 0;
+    for (const id of ids) { s += perSensor[id][i].bmTempSum; n += perSensor[id][i].bmTempN; }
+    return n ? s / n : null;
+  });
+  datasets.push({
+    label: "gateway temp (°C)",
+    data: gwLine.map((v, i) => ({ x: xAt(i), y: v })),
+    borderColor: "#F28E2Baa", backgroundColor: "#F28E2Baa",
+    pointRadius: 0, borderWidth: 1, borderDash: [5, 4], tension: 0.2,
+    yAxisID: "y1", spanGaps: true,
+  });
+  datasets.push({
+    label: "boomerang temp (°C)",
+    data: bmLine.map((v, i) => ({ x: xAt(i), y: v })),
+    borderColor: "#E15759aa", backgroundColor: "#E15759aa",
+    pointRadius: 0, borderWidth: 1, borderDash: [2, 4], tension: 0.2,
+    yAxisID: "y2", spanGaps: true,
+  });
+
+  upsertChart("chartA", {
+    type: "line",
+    data: { datasets },
+    options: { ...baseOpts(), plugins: {
+        legend: { ...legendOpts(), labels: { ...legendOpts().labels,
+          filter: (item, chart) => {
+            const ds = chart.datasets[item.datasetIndex];
+            return !!ds && ds.sensorId == null;
+          },
+        } },
+        tooltip: {
+          ...tooltipOpts(),
+          mode: "nearest", intersect: false,
+          bodyFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+          titleFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+          filter: ctx => ctx.dataset.sensorId != null,
+          callbacks: {
+            title: () => "",
+            label: ctx => {
+              const x = ctx.parsed?.x;
+              const t = x != null ? fmtDateTz(new Date(x), state.tz, true) : "";
+              return `${t} · ${ctx.dataset.sensorId}`;
+            },
+            afterLabel: ctx => {
+              const d = ctx.raw || {};
+              const pad = s => s.padEnd(17);
+              return [
+                `${pad("samples")}: ${ctx.parsed.y}`,
+                `${pad("gateway temp")}: ${fmt(d.gwTemp, 1)} °C`,
+                `${pad("boomerang temp")}: ${fmt(d.bmTemp, 1)} °C`,
+                `${pad("gateway battery")}: ${fmt(d.gwBatt, 2)} V`,
+                `${pad("boomerang battery")}: ${fmt(d.bmBatt, 2)} V`,
+                `${pad("solar voltage")}: ${fmt(d.solar, 2)} V`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ...timeAxis(), min: tA, max: tB },
+        y: { ...numAxis("data points / bucket"), position: "left" },
+        y1: { ...numAxis("gateway °C"), position: "right",
+              grid: { drawOnChartArea: false }, ...gwRange },
+        y2: { ...numAxis("boomerang °C"), position: "right",
+              grid: { drawOnChartArea: false }, ...bmRange,
+              afterFit: (scale) => { scale.width = 58; } },
+      },
+    },
+  });
+
+  // A table: per-sensor samples + avg temps/batteries/solar
+  const totSum = (arr, key) => arr.reduce((s, b) => s + b[key], 0);
+  const totN   = (arr, key) => arr.reduce((s, b) => s + b[key], 0);
+  const rowsA = ids.map(id => {
+    const bks = perSensor[id];
+    return {
+      id,
+      samples: bks.reduce((s, b) => s + b.count, 0),
+      gwTemp: totN(bks, "gwTempN") ? totSum(bks, "gwTempSum") / totN(bks, "gwTempN") : null,
+      bmTemp: totN(bks, "bmTempN") ? totSum(bks, "bmTempSum") / totN(bks, "bmTempN") : null,
+      gwBatt: totN(bks, "gwBattN") ? totSum(bks, "gwBattSum") / totN(bks, "gwBattN") : null,
+      bmBatt: totN(bks, "bmBattN") ? totSum(bks, "bmBattSum") / totN(bks, "bmBattN") : null,
+      solar:  totN(bks, "solarN")  ? totSum(bks, "solarSum")  / totN(bks, "solarN")  : null,
+    };
+  }).sort((a,b) => b.samples - a.samples);
+  const totA = rowsA.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("aTable", [
+    sensorCol,
+    { label: "Samples",       render: r => r.samples.toLocaleString() },
+    { label: "Gateway °C",    render: r => fmt(r.gwTemp, 1) },
+    { label: "Boomerang °C",  render: r => fmt(r.bmTemp, 1) },
+    { label: "Gateway V",     render: r => fmt(r.gwBatt, 2) },
+    { label: "Boomerang V",   render: r => fmt(r.bmBatt, 2) },
+    { label: "Solar V",       render: r => fmt(r.solar, 2) },
+  ], rowsA, { "Sensor": "total", "Samples": totA.toLocaleString() });
+}
+
+function renderChartDup(boom, heartbeats) {
+  const ids = Array.from(tabSensorIds());
+  const tableHost = document.getElementById("dupTableWrap");
+  tableHost.innerHTML = "";
+  heartbeats = heartbeats || [];
+
+  // Per-sensor totals (table uses these across all filter-matching rows, valid-ts or not).
+  const stats = ids.map(id => {
+    const rows = boom.filter(r => r.sensor_key === id);
+    const seen = new Map();
+    let dup = 0;
+    for (const r of rows) {
+      const k = boomDupKey(r);
+      const prev = seen.get(k) || 0;
+      seen.set(k, prev + 1);
+      if (prev > 0) dup++;
+    }
+    return { id, samples: rows.length, duplicates: dup,
+      pct: rows.length ? (100 * dup / rows.length) : 0 };
+  }).sort((a,b) => b.duplicates - a.duplicates);
+
+  // Heartbeat totals (one extra row in the table + one line on the chart)
+  const hbStats = (() => {
+    const seen = new Map();
+    let dup = 0;
+    for (const r of heartbeats) {
+      const k = gwDupKey(r);
+      const prev = seen.get(k) || 0;
+      seen.set(k, prev + 1);
+      if (prev > 0) dup++;
+    }
+    return { samples: heartbeats.length, duplicates: dup,
+      pct: heartbeats.length ? (100 * dup / heartbeats.length) : 0 };
+  })();
+
+  // Build per-sensor time-bucketed duplicates for the chart (valid-ts only).
+  const validTs = boom.filter(r => r.ts_valid);
+  const hbValidTs = heartbeats.filter(r => r.ts_valid);
+  const N = 40;
+  let tA, tB, step;
+  const dupCounts = {};
+  const hbBuckets = new Array(N).fill(0);
+  for (const id of ids) dupCounts[id] = new Array(N).fill(0);
+  const anyValid = validTs.length || hbValidTs.length;
+  if (anyValid) {
+    const tsArr = [...validTs, ...hbValidTs].map(r => r.ts.getTime());
+    tA = state.fromUtc ? state.fromUtc.getTime() : Math.min(...tsArr);
+    tB = state.toUtc   ? state.toUtc.getTime()   : Math.max(...tsArr);
+    const w = Math.max(1, (tB - tA) / N);
+    for (const id of ids) {
+      const rows = validTs.filter(r => r.sensor_key === id).sort((a,b) => a.ts - b.ts);
+      const seen = new Map();
+      for (const r of rows) {
+        const k = boomDupKey(r);
+        const prev = seen.get(k) || 0;
+        seen.set(k, prev + 1);
+        if (prev > 0) {
+          const idx = Math.min(N-1, Math.max(0, Math.floor((r.ts.getTime() - tA) / w)));
+          dupCounts[id][idx]++;
+        }
+      }
+    }
+    {
+      const seen = new Map();
+      for (const r of hbValidTs.slice().sort((a,b) => a.ts - b.ts)) {
+        const k = gwDupKey(r);
+        const prev = seen.get(k) || 0;
+        seen.set(k, prev + 1);
+        if (prev > 0) {
+          const idx = Math.min(N-1, Math.max(0, Math.floor((r.ts.getTime() - tA) / w)));
+          hbBuckets[idx]++;
+        }
+      }
+    }
+    step = N > 1 ? (tB - tA) / (N - 1) : 0;
+  }
+
+  // Chart
+  if (!anyValid) {
+    upsertChart("chartDup", emptyChart("no valid-timestamp data in window"));
+  } else {
+    const xAt = i => new Date(tA + i * step);
+    const totalById = Object.fromEntries(stats.map(s => [s.id, s.duplicates]));
+    const datasets = ids.map(id => ({
+      label: id, sensorId: id, kind: "boomerang",
+      data: dupCounts[id].map((c, i) => ({ x: xAt(i), y: c })),
+      borderColor: state.sensorColor[id], backgroundColor: state.sensorColor[id],
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.2, yAxisID: "y",
+    }));
+    datasets.push({
+      label: "heartbeat", sensorId: "heartbeat", kind: "heartbeat",
+      data: hbBuckets.map((c, i) => ({ x: xAt(i), y: c })),
+      borderColor: "#64748b", backgroundColor: "#64748b44",
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.2,
+      borderDash: [6, 4], yAxisID: "y",
+    });
+    upsertChart("chartDup", {
+      type: "line",
+      data: { datasets },
+      options: { ...baseOpts(), plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...tooltipOpts(),
+            mode: "nearest", intersect: false,
+            bodyFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+            titleFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+            filter: ctx => ctx.dataset.sensorId != null,
+            callbacks: {
+              title: () => "",
+              label: ctx => {
+                const x = ctx.parsed?.x;
+                const t = x != null ? fmtDateTz(new Date(x), state.tz, true) : "";
+                const name = ctx.dataset.kind === "heartbeat" ? "heartbeat" : ctx.dataset.sensorId;
+                return `${t} · ${name}`;
+              },
+              afterLabel: ctx => {
+                const pad = s => s.padEnd(17);
+                const isHb = ctx.dataset.kind === "heartbeat";
+                const total = isHb ? hbStats.duplicates : (totalById[ctx.dataset.sensorId] || 0);
+                const label = isHb ? "heartbeat total dup" : "sensor total dup";
+                return [
+                  `${pad("duplicates")}: ${ctx.parsed.y}`,
+                  `${pad(label)}: ${total}`,
+                ];
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ...timeAxis(), min: tA, max: tB },
+          y: { ...numAxis("duplicates / bucket"), position: "left" },
+        },
+      },
+    });
+  }
+
+  // Table
+  if (!ids.length && !heartbeats.length) {
+    tableHost.innerHTML = '<div class="muted" style="font-size:12px; padding: 12px">No data</div>';
+    return;
+  }
+  const totSamples = stats.reduce((a, s) => a + s.samples, 0) + hbStats.samples;
+  const totDup     = stats.reduce((a, s) => a + s.duplicates, 0) + hbStats.duplicates;
+  const totPct     = totSamples ? (100 * totDup / totSamples) : 0;
+  const tbl = document.createElement("table");
+  tbl.className = "dup-table";
+  const sensorRowsHtml = stats.map(s => `
+    <tr>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${state.sensorColor[s.id] || '#888'};margin-right:6px;vertical-align:middle"></span>${s.id}</td>
+      <td><span class="muted" style="font-size:11px">boomerang</span></td>
+      <td>${s.samples.toLocaleString()}</td>
+      <td>${s.duplicates.toLocaleString()}</td>
+      <td>${s.pct.toFixed(1)}%</td>
+    </tr>`).join("");
+  const hbRowHtml = `
+    <tr>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#64748b;margin-right:6px;vertical-align:middle"></span>heartbeat</td>
+      <td><span class="muted" style="font-size:11px">gateway-only</span></td>
+      <td>${hbStats.samples.toLocaleString()}</td>
+      <td>${hbStats.duplicates.toLocaleString()}</td>
+      <td>${hbStats.pct.toFixed(1)}%</td>
+    </tr>`;
+  tbl.innerHTML = `
+    <thead>
+      <tr><th>Source</th><th>Type</th><th>Samples</th><th>Duplicates</th><th>% dup</th></tr>
+    </thead>
+    <tbody>${sensorRowsHtml}${hbRowHtml}</tbody>
+    <tfoot>
+      <tr>
+        <td>total</td>
+        <td></td>
+        <td>${totSamples.toLocaleString()}</td>
+        <td>${totDup.toLocaleString()}</td>
+        <td>${totPct.toFixed(1)}%</td>
+      </tr>
+    </tfoot>`;
+  tableHost.appendChild(tbl);
+}
+
+function renderChartB(boom) {
+  const byId = groupBy(boom, r => r.sensor_key);
+  const ids = Array.from(tabSensorIds());
+  const min = [], avgA = [], p95A = [], maxA = [];
+  for (const i of ids) {
+    const vals = (byId.get(i) || []).map(r => r.BoomerangData_pcb_accel_long_max).filter(v => v != null);
+    if (!vals.length) { min.push(null); avgA.push(null); p95A.push(null); maxA.push(null); continue; }
+    min.push(Math.min(...vals)); maxA.push(Math.max(...vals));
+    avgA.push(avg(vals)); p95A.push(pct(vals, 95));
+  }
+  upsertChart("chartB", {
+    type: "bar",
+    data: { labels: ids, datasets: [
+      { label: "min", data: min, backgroundColor: "#76B7B2" },
+      { label: "avg", data: avgA, backgroundColor: "#4E79A7" },
+      { label: "p95", data: p95A, backgroundColor: "#F28E2B" },
+      { label: "max", data: maxA, backgroundColor: "#E15759" },
+    ] },
+    options: { ...baseOpts(), plugins: { legend: legendOpts(), tooltip: tooltipOpts() },
+      scales: { x: catAxis(), y: numAxis("g") } },
+  });
+
+  // B table: per-sensor accel_long_max stats
+  const rowsB = ids.map((id, i) => {
+    const rs = (byId.get(id) || []).map(r => r.BoomerangData_pcb_accel_long_max).filter(v => v != null);
+    return { id, samples: rs.length, min: min[i], avg: avgA[i], p95: p95A[i], max: maxA[i] };
+  }).sort((a,b) => (b.max || 0) - (a.max || 0));
+  const totB = rowsB.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("bTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "min", render: r => fmt(r.min, 2) },
+    { label: "avg", render: r => fmt(r.avg, 2) },
+    { label: "p95", render: r => fmt(r.p95, 2) },
+    { label: "max", render: r => fmt(r.max, 2) },
+  ], rowsB, { "Sensor": "total", "Samples": totB.toLocaleString() });
+}
+
+function renderChartC(tsBoom) {
+  const byId = groupBy(tsBoom, r => r.sensor_key);
+  const datasets = Array.from(tabSensorIds()).map(id => {
+    const rs = (byId.get(id) || []).filter(r => r.BoomerangData_bearing_temp != null).sort((a,b) => a.ts - b.ts);
+    return { label: id, sensorId: id,
+      data: rs.map(r => ({ x: r.ts, y: r.BoomerangData_bearing_temp })),
+      borderColor: state.sensorColor[id], backgroundColor: state.sensorColor[id],
+      pointRadius: 0, borderWidth: 1.5, tension: 0.15 };
+  }).filter(d => d.data.length);
+  const allTs = tsBoom.map(r => r.ts.getTime());
+  const tA = state.fromUtc ? state.fromUtc.getTime() : (allTs.length ? Math.min(...allTs) : undefined);
+  const tB = state.toUtc   ? state.toUtc.getTime()   : (allTs.length ? Math.max(...allTs) : undefined);
+  upsertChart("chartC", {
+    type: "line",
+    data: { datasets },
+    options: { ...baseOpts(), plugins: { legend: { display: false }, tooltip: timeTooltipOpts() },
+      scales: { x: { ...timeAxis(), min: tA, max: tB }, y: numAxis("°C") } },
+  });
+
+  // C table: per-sensor bearing_temp stats
+  const rowsC = Array.from(tabSensorIds()).map(id => {
+    const vs = (byId.get(id) || [])
+      .map(r => r.BoomerangData_bearing_temp).filter(v => v != null);
+    return {
+      id, samples: vs.length,
+      min: vs.length ? Math.min(...vs) : null,
+      avg: avg(vs),
+      max: vs.length ? Math.max(...vs) : null,
+    };
+  }).sort((a,b) => b.samples - a.samples);
+  const totC = rowsC.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("cTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "min °C", render: r => fmt(r.min, 1) },
+    { label: "avg °C", render: r => fmt(r.avg, 1) },
+    { label: "max °C", render: r => fmt(r.max, 1) },
+  ], rowsC, { "Sensor": "total", "Samples": totC.toLocaleString() });
+}
+
+function renderChartD(boom) {
+  const datasets = STATE_LABELS.filter(s => state.filter.selectedStates.has(s)).map(s => {
+    const pts = boom.filter(r => r.gateway_state === s
+      && r.BoomerangData_pcb_accel_long_max != null && r.BoomerangData_pcb_accel_vert_max != null)
+      .map(r => ({ x: r.BoomerangData_pcb_accel_long_max, y: r.BoomerangData_pcb_accel_vert_max }));
+    return { label: s, data: pts, backgroundColor: STATE_COLORS[s] + "cc", pointRadius: 2 };
+  }).filter(d => d.data.length);
+  upsertChart("chartD", {
+    type: "scatter",
+    data: { datasets },
+    options: { ...baseOpts(), plugins: { legend: legendOpts(), tooltip: tooltipOpts() },
+      scales: { x: numAxis("accel_long_max (g)"), y: numAxis("accel_vert_max (g)") } },
+  });
+
+  // D table: per-sensor breakdown by state (samples + avg long/vert per state)
+  const tabIds = Array.from(tabSensorIds());
+  const statesSel = STATE_LABELS.filter(s => state.filter.selectedStates.has(s));
+  const rowsD = tabIds.map(id => {
+    const rs = boom.filter(r => r.sensor_key === id
+      && r.BoomerangData_pcb_accel_long_max != null
+      && r.BoomerangData_pcb_accel_vert_max != null);
+    return {
+      id, samples: rs.length,
+      avgLong: avg(rs.map(r => r.BoomerangData_pcb_accel_long_max)),
+      avgVert: avg(rs.map(r => r.BoomerangData_pcb_accel_vert_max)),
+      moving:  rs.filter(r => r.gateway_state === "currently_moving").length,
+      parked:  rs.filter(r => r.gateway_state === "currently_parked").length,
+      transitions: rs.filter(r =>
+        r.gateway_state === "was_parked_now_moving" || r.gateway_state === "was_moving_now_parked").length,
+    };
+  }).sort((a,b) => b.samples - a.samples);
+  const totD = rowsD.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("dTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "avg long", render: r => fmt(r.avgLong, 2) },
+    { label: "avg vert", render: r => fmt(r.avgVert, 2) },
+    { label: "moving", render: r => r.moving.toLocaleString() },
+    { label: "parked", render: r => r.parked.toLocaleString() },
+    { label: "transitions", render: r => r.transitions.toLocaleString() },
+  ], rowsD, { "Sensor": "total", "Samples": totD.toLocaleString() });
+}
+
+function renderChartE(boom) {
+  const vals = boom.map(r => r.BoomerangData_adxl_max).filter(v => v != null);
+  if (!vals.length) { upsertChart("chartE", emptyChart("no adxl_max data")); return; }
+  const bins = histogram(vals, 24);
+  const active = tabSensorIds();
+  const overlay = [];
+  if (active.size === 1) {
+    const only = Array.from(active)[0];
+    const vs = boom.filter(r => r.sensor_key === only).map(r => r.BoomerangData_adxl_max).filter(v => v != null);
+    overlay.push({ label: `sensor ${only}`, data: histogramInto(vs, bins.edges),
+      backgroundColor: state.sensorColor[only] + "cc" });
+  }
+  upsertChart("chartE", {
+    type: "bar",
+    data: { labels: bins.labels, datasets: [
+      { label: "all selected", data: bins.counts, backgroundColor: "#4E79A788" },
+      ...overlay,
+    ] },
+    options: { ...baseOpts(), plugins: { legend: legendOpts(), tooltip: tooltipOpts() },
+      scales: { x: catAxis("adxl_max bucket (g)"), y: numAxis("count") } },
+  });
+
+  // E table: per-sensor adxl_max stats
+  const rowsE = Array.from(tabSensorIds()).map(id => {
+    const vs = boom.filter(r => r.sensor_key === id)
+      .map(r => r.BoomerangData_adxl_max).filter(v => v != null);
+    return {
+      id, samples: vs.length,
+      min: vs.length ? Math.min(...vs) : null,
+      avg: avg(vs),
+      p95: pct(vs, 95),
+      max: vs.length ? Math.max(...vs) : null,
+    };
+  }).sort((a,b) => (b.max || 0) - (a.max || 0));
+  const totE = rowsE.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("eTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "min", render: r => fmt(r.min, 2) },
+    { label: "avg", render: r => fmt(r.avg, 2) },
+    { label: "p95", render: r => fmt(r.p95, 2) },
+    { label: "max", render: r => fmt(r.max, 2) },
+  ], rowsE, { "Sensor": "total", "Samples": totE.toLocaleString() });
+}
+
+function renderChartF(tsBoom) {
+  const byId = groupBy(tsBoom, r => r.sensor_key);
+  const datasets = Array.from(tabSensorIds()).map(id => {
+    const rs = (byId.get(id) || []).filter(r => r.boom_battery_V != null).sort((a,b) => a.ts - b.ts);
+    return { label: id, sensorId: id,
+      data: rs.map(r => ({ x: r.ts, y: r.boom_battery_V })),
+      borderColor: state.sensorColor[id], backgroundColor: state.sensorColor[id],
+      pointRadius: 0, borderWidth: 1.5, tension: 0.15 };
+  }).filter(d => d.data.length);
+  const allTs = tsBoom.map(r => r.ts.getTime());
+  const tA = state.fromUtc ? state.fromUtc.getTime() : (allTs.length ? Math.min(...allTs) : undefined);
+  const tB = state.toUtc   ? state.toUtc.getTime()   : (allTs.length ? Math.max(...allTs) : undefined);
+  upsertChart("chartF", {
+    type: "line",
+    data: { datasets },
+    options: { ...baseOpts(), plugins: { legend: { display: false }, tooltip: timeTooltipOpts() },
+      scales: { x: { ...timeAxis(), min: tA, max: tB }, y: numAxis("V") } },
+  });
+
+  // F table: per-sensor boomerang battery V stats
+  const rowsF = Array.from(tabSensorIds()).map(id => {
+    const vs = (byId.get(id) || []).map(r => r.boom_battery_V).filter(v => v != null);
+    return {
+      id, samples: vs.length,
+      min: vs.length ? Math.min(...vs) : null,
+      avg: avg(vs),
+      max: vs.length ? Math.max(...vs) : null,
+    };
+  }).sort((a,b) => (a.min ?? Infinity) - (b.min ?? Infinity));
+  const totF = rowsF.reduce((s, r) => s + r.samples, 0);
+  renderStatsTable("fTable", [
+    sensorCol,
+    { label: "Samples", render: r => r.samples.toLocaleString() },
+    { label: "min V", render: r => fmt(r.min, 2) },
+    { label: "avg V", render: r => fmt(r.avg, 2) },
+    { label: "max V", render: r => fmt(r.max, 2) },
+  ], rowsF, { "Sensor": "total", "Samples": totF.toLocaleString() });
+}
+
+function renderChartG(tsAllRaw, tsAllDD) {
+  const sorted = [...(tsAllDD || tsAllRaw)].sort((a,b) => a.ts - b.ts);
+  if (!sorted.length) { upsertChart("chartG", emptyChart("no data")); return; }
+
+  // Gateway-level duplicates counted from the raw (not deduped) stream.
+  const seen = new Map();
+  const dupTimestamps = [];
+  for (const r of (tsAllRaw || []).slice().sort((a,b) => a.ts - b.ts)) {
+    const k = gwDupKey(r);
+    const prev = seen.get(k) || 0;
+    seen.set(k, prev + 1);
+    if (prev > 0) dupTimestamps.push(r.ts.getTime());
+  }
+  const dupTotal = dupTimestamps.length;
+
+  // Bucket all series to the same x grid so mode:"index" aligns every tooltip entry.
+  const N = 40;
+  const tA = state.fromUtc ? state.fromUtc.getTime() : sorted[0].ts.getTime();
+  const tB = state.toUtc   ? state.toUtc.getTime()   : sorted[sorted.length - 1].ts.getTime();
+  const w = Math.max(1, (tB - tA) / N);
+  const bkt = Array.from({ length: N }, () => ({
+    battSum: 0, battN: 0, solSum: 0, solN: 0, rssiSum: 0, rssiN: 0, dup: 0,
+  }));
+  for (const r of sorted) {
+    const idx = Math.min(N-1, Math.max(0, Math.floor((r.ts.getTime() - tA) / w)));
+    if (r.battery_V != null)    { bkt[idx].battSum += r.battery_V; bkt[idx].battN++; }
+    if (r.solar_V != null)      { bkt[idx].solSum  += r.solar_V;   bkt[idx].solN++; }
+    if (r.CellScan_rssi != null && r.CellScan_rssi !== -255 && r.CellScan_rssi !== 0) {
+      bkt[idx].rssiSum += r.CellScan_rssi; bkt[idx].rssiN++;
+    }
+  }
+  for (const t of dupTimestamps) {
+    const idx = Math.min(N-1, Math.max(0, Math.floor((t - tA) / w)));
+    bkt[idx].dup++;
+  }
+  const xAt = i => new Date(tA + (i + 0.5) * w);
+  const avgOr = (s, n) => n ? s / n : null;
+  const dupMax = Math.max(0, ...bkt.map(b => b.dup));
+
+  const ds = [
+    { label: "Avg battery (V)", borderColor: "#4E79A7", backgroundColor: "#4E79A7",
+      data: bkt.map((b, i) => ({ x: xAt(i), y: avgOr(b.battSum, b.battN) })),
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.15, yAxisID: "y", spanGaps: true },
+    { label: "Avg solar (V)", borderColor: "#F28E2B", backgroundColor: "#F28E2B",
+      data: bkt.map((b, i) => ({ x: xAt(i), y: avgOr(b.solSum, b.solN) })),
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.15, yAxisID: "y", spanGaps: true },
+    { label: "Avg RSSI (dBm)", borderColor: "#B07AA1", backgroundColor: "#B07AA1",
+      data: bkt.map((b, i) => ({ x: xAt(i), y: avgOr(b.rssiSum, b.rssiN) })),
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.5, tension: 0.15, yAxisID: "y1", spanGaps: true },
+    { label: `Duplicates (total ${dupTotal})`,
+      borderColor: "#E15759", backgroundColor: "#E1575933",
+      data: bkt.map((b, i) => ({ x: xAt(i), y: b.dup })),
+      pointRadius: 0, pointHoverRadius: 4, borderWidth: 1.2, tension: 0.2,
+      borderDash: [4, 3], fill: true, yAxisID: "y2" },
+  ];
+  upsertChart("chartG", {
+    type: "line", data: { datasets: ds },
+    options: { ...baseOpts(), plugins: {
+        legend: legendOpts(),
+        tooltip: {
+          ...tooltipOpts(),
+          mode: "index", intersect: false,
+          bodyFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+          titleFont: { family: "ui-monospace, SFMono-Regular, Menlo, monospace", size: 12 },
+          callbacks: {
+            title: items => {
+              const x = items[0]?.parsed?.x;
+              return x != null ? fmtDateTz(new Date(x), state.tz, true) : "";
+            },
+            label: ctx => {
+	              const pad = s => s.padEnd(10);
+	              const raw = ctx.dataset.label || "";
+	              const name = raw.startsWith("Duplicates") ? "Duplicates"
+	                          : raw === "Avg battery (V)" ? "Battery"
+	                          : raw === "Avg solar (V)"   ? "Solar"
+	                          : raw === "Avg RSSI (dBm)"  ? "RSSI"
+	                          : raw;
+	              const y = ctx.parsed.y;
+	              const v = (y == null || !Number.isFinite(y)) ? "—"
+	                     : name === "Battery" || name === "Solar" ? `${y.toFixed(2)} V`
+	                     : name === "RSSI"        ? `${Math.round(y)} dBm`
+	                     : name === "Duplicates"  ? String(Math.round(y))
+	                     : String(y);
+              return `${pad(name)}: ${v}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ...timeAxis(), min: tA, max: tB },
+	        y:  { ...numAxis("V"), position: "left" },
+	        y1: { ...numAxis("RSSI (dBm)"), position: "right", grid: { drawOnChartArea: false } },
+	        y2: { ...numAxis("duplicates"), position: "right", grid: { drawOnChartArea: false },
+	              min: 0, suggestedMax: Math.max(1, dupMax), ticks: {
+	                precision: 0,
+	                stepSize: 1,
+	                callback: value => Number.isInteger(Number(value)) ? String(Math.trunc(Number(value))) : "",
+	              },
+	              afterFit: (s) => { s.width = 52; } },
+      },
+    },
+  });
+}
+
+function renderChartH(tsAll) {
+  if (!tsAll.length) { upsertChart("chartH", emptyChart("no valid timestamps")); return; }
+  const tA = Math.min(...tsAll.map(r => r.ts.getTime()));
+  const tB = Math.max(...tsAll.map(r => r.ts.getTime()));
+  const bucketCount = 40;
+  const span = Math.max(1, tB - tA);
+  const width = span / bucketCount;
+  const buckets = Array.from({length: bucketCount}, (_, i) => ({
+    x: new Date(tA + i * width + width / 2),
+    counts: Object.fromEntries(STATE_LABELS.map(s => [s, 0])),
+  }));
+  for (const r of tsAll) {
+    const idx = Math.min(bucketCount - 1, Math.floor((r.ts.getTime() - tA) / width));
+    if (buckets[idx].counts[r.gateway_state] != null) buckets[idx].counts[r.gateway_state]++;
+  }
+  const datasets = STATE_LABELS.map(s => ({
+    label: s, backgroundColor: STATE_COLORS[s], borderColor: STATE_COLORS[s],
+    data: buckets.map(b => ({ x: b.x, y: b.counts[s] })), stack: "st", fill: true, pointRadius: 0,
+  }));
+  upsertChart("chartH", {
+    type: "line", data: { datasets },
+    options: { ...baseOpts(), plugins: { legend: legendOpts(), tooltip: timeTooltipOpts() },
+      scales: { x: timeAxis(), y: { ...numAxis("rows / bucket"), stacked: true } } },
+  });
+}
+
+// ---------- Map ----------
+function renderMap(all) {
+  const pts = all.filter(r => {
+    if (r.lat == null || r.lon == null) return false;
+    if (r.lat === 0 && r.lon === 0) return false;
+    if (Math.abs(r.lat) > 90 || Math.abs(r.lon) > 180) return false;
+    const isBoom = r.sensor_key != null;
+    if (isBoom && !state.mapShowBoomerang) return false;
+    if (!isBoom && !state.mapShowHeartbeat) return false;
+    return true;
+  });
+  if (!state.map) {
+    state.map = L.map("map", { zoomControl: true });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: "© OpenStreetMap · © CARTO", subdomains: "abcd", maxZoom: 19,
+    }).addTo(state.map);
+  }
+  if (state.mapLayer) state.map.removeLayer(state.mapLayer);
+  if (!pts.length) { state.map.setView([0,0], 2); return; }
+
+  // Group points by exact coordinate
+  const byLoc = new Map();
+  for (const r of pts) {
+    const k = `${r.lat.toFixed(6)},${r.lon.toFixed(6)}`;
+    if (!byLoc.has(k)) byLoc.set(k, []);
+    byLoc.get(k).push(r);
+  }
+
+  const gwDupKey = r => [
+    r.epoch_seconds, r.battery_voltage_centivolts, r.solar_voltage_centivolts,
+    r.system_temperature_celsius, r.current_config_id, r.gateway_state, r.CellScan_rssi,
+  ].join("|");
+
+  const group = L.layerGroup();
+  for (const rows of byLoc.values()) {
+    const first = rows[0];
+    const lat = first.lat, lon = first.lon;
+
+    // Time range for this location
+    const tsList = rows.filter(r => r.ts_valid).map(r => r.ts.getTime());
+    let dateStr = "—";
+    if (tsList.length) {
+      const tMin = new Date(Math.min(...tsList));
+      const tMax = new Date(Math.max(...tsList));
+      dateStr = tMin.getTime() === tMax.getTime()
+        ? fmtDateTz(tMin, state.tz, true)
+        : `${fmtDateTz(tMin, state.tz, false)} → ${fmtDateTz(tMax, state.tz, false)}`;
+    }
+
+    const states  = [...new Set(rows.map(r => r.gateway_state).filter(v => v))];
+    const boomIds = [...new Set(rows.map(r => r.sensor_key).filter(v => v))];
+    const speeds  = rows.map(r => r.GPSScan_velocity_kmh).filter(v => v != null);
+    const speedStr = speeds.length
+      ? (Math.min(...speeds) === Math.max(...speeds)
+          ? `${speeds[0]} km/h`
+          : `${Math.min(...speeds)}–${Math.max(...speeds)} km/h`)
+      : "—";
+
+    // Gateway-level duplicates at this location
+    const seen = new Map();
+    let dupCount = 0;
+    for (const r of rows) {
+      const k = gwDupKey(r);
+      const prev = seen.get(k) || 0;
+      seen.set(k, prev + 1);
+      if (prev > 0) dupCount++;
+    }
+
+    const color = STATE_COLORS[first.gateway_state] || "#4E79A7";
+    const row = (label, val) =>
+      `<span class="k">${label}</span><span class="v">${val}</span>`;
+    const html = `<div class="map-tooltip">
+      ${row("Date&Time", dateStr)}
+      ${row("Coordinates", `${lat.toFixed(5)}, ${lon.toFixed(5)}`)}
+      ${row("State", states.length ? states.join(", ") : "—")}
+      ${row("Boomerang IDs", boomIds.length ? boomIds.join(", ") : "—")}
+      ${row("Speed", speedStr)}
+      ${row("Duplicated points", dupCount.toLocaleString())}
+      ${row("Total points", rows.length.toLocaleString())}
+    </div>`;
+
+    L.circleMarker([lat, lon], {
+      radius: 4, color, weight: 1,
+      fillColor: color, fillOpacity: 0.7,
+    }).bindTooltip(html, { direction: "top", offset: [0, -4], sticky: true }).addTo(group);
+  }
+  group.addTo(state.map);
+  state.mapLayer = group;
+  const latlngs = pts.map(r => [r.lat, r.lon]);
+  try { state.map.fitBounds(L.latLngBounds(latlngs).pad(0.1)); } catch {}
+}
+
+// ---------- Chart helpers ----------
+function baseOpts() {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false, parsing: true,
+    interaction: { mode: "nearest", intersect: false },
+  };
+}
+function legendOpts() {
+  return { labels: { color: "#334155", boxWidth: 10, boxHeight: 10, font: { size: 11 } } };
+}
+function tooltipOpts() {
+  return { backgroundColor: "#ffffff", titleColor: "#1a202c", bodyColor: "#334155",
+    borderColor: "#e2e8f0", borderWidth: 1 };
+}
+function timeTooltipOpts() {
+  return { ...tooltipOpts(), callbacks: {
+    title: items => {
+      const x = items[0]?.parsed?.x;
+      return x != null ? fmtDateTz(new Date(x), state.tz, true) : "";
+    },
+  } };
+}
+function catAxis(title) {
+  return { type: "category", ticks: { color: "#64748b", maxRotation: 60, minRotation: 0, font: { size: 10 } },
+    grid: { color: "#e5e7eb" }, title: title ? { display: true, text: title, color: "#64748b" } : undefined };
+}
+function numAxis(title) {
+  return { type: "linear", ticks: { color: "#64748b", font: { size: 10 },
+      callback: value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : value },
+    grid: { color: "#e5e7eb" },
+    title: title ? { display: true, text: title, color: "#64748b" } : undefined };
+}
+function countAxis(title) {
+  return { type: "linear", beginAtZero: true,
+    ticks: {
+      color: "#64748b", font: { size: 10 }, precision: 0, stepSize: 1,
+      callback: value => Number.isInteger(Number(value)) ? String(Math.trunc(Number(value))) : "",
+    },
+    grid: { color: "#e5e7eb" },
+    title: title ? { display: true, text: title, color: "#64748b" } : undefined };
+}
+function timeAxis() {
+  return {
+    type: "linear",
+    ticks: {
+      color: "#64748b", font: { size: 10 }, maxTicksLimit: 8,
+      callback: v => fmtDateTz(new Date(v), state.tz, false),
+    },
+    grid: { color: "#e5e7eb" },
+  };
+}
+function emptyChart(text) {
+  return { type: "bar", data: { labels: [text], datasets: [{ data: [0], backgroundColor: "#cbd5e1" }] },
+    options: { ...baseOpts(), plugins: { legend: { display:false } }, scales: { x: catAxis(), y: numAxis() } } };
+}
+
+// ---------- Utilities ----------
+function groupBy(arr, fn) {
+  const m = new Map();
+  for (const x of arr) { const k = fn(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); }
+  return m;
+}
+function avg(a) { return a.length ? a.reduce((s,v) => s+v, 0) / a.length : null; }
+function fmtRssiCell(v) {
+  return v == null ? "—" : v.toFixed(0);
+}
+function fmtRssiPair(min, max) {
+  if (min == null && max == null) return "—";
+  return `<span class="rssi-pair"><span class="${rssiTokenClass(min)}">${fmtRssiCell(min)}</span><span class="rssi-sep">/</span><span class="${rssiTokenClass(max)}">${fmtRssiCell(max)}</span></span>`;
+}
+function fmtVoltageStats(stats, kind) {
+  if (!stats) return "—";
+  return `<span class="voltage-triplet">${[stats.min, stats.avg, stats.max].map(v =>
+    `<span class="${voltageClass(kind, v)}">${v.toFixed(2)}</span>`).join('<span class="rssi-sep">/</span>')}</span>`;
+}
+function fmtVoltageValue(v, kind) {
+  return v == null ? "—" : `<span class="${voltageClass(kind, v)}">${v.toFixed(2)}</span>`;
+}
+function fmtDateStack(d) {
+  if (!d || !(d instanceof Date) || isNaN(d)) return "—";
+  const s = fmtDateTz(d, state.tz, true);
+  const [date, time] = s.split(" ");
+  return `<span class="date-stack"><span>${date}</span><span class="time">${time || ""}</span></span>`;
+}
+function fmtRssiValue(v) {
+  return v == null ? "—" : `<span class="${rssiTokenClass(v)}">${fmtRssiCell(v)}</span>`;
+}
+function timelineDetailRow(r, idx) {
+  const rawRssi = (r.CellScan_rssi != null && r.CellScan_rssi !== -255 && r.CellScan_rssi !== 0) ? r.CellScan_rssi : null;
+  return `<tr>
+    <td>${idx + 1}</td>
+    <td>${fmtDateTz(r.ts, state.tz, true)}</td>
+    <td>${r.sensor_key ? "Boomerang" : "Heartbeat"}</td>
+    <td>${escapeHtml(r.sensor_key || "—")}</td>
+    <td>${escapeHtml(r.gateway_state || "—")}</td>
+    <td>${fmtRssiValue(rawRssi)}</td>
+    <td>${r.GPSScan_fix_type == null ? "—" : escapeHtml(String(r.GPSScan_fix_type))}</td>
+    <td>${fmtVoltageValue(r.battery_V, "battery")}</td>
+    <td>${fmtVoltageValue(r.solar_V, "solar")}</td>
+  </tr>`;
+}
+function rssiClass(v) {
+  if (v == null) return "rssi-cell";
+  if (v <= -120) return "rssi-cell rssi-very-weak";
+  if (v <= -110) return "rssi-cell rssi-weak";
+  if (v <= -100) return "rssi-cell rssi-fair";
+  if (v <= -90) return "rssi-cell rssi-good";
+  return "rssi-cell rssi-strong";
+}
+function rssiTokenClass(v) {
+  return rssiClass(v).replace("rssi-cell", "rssi-token").trim();
+}
+function voltageClass(kind, v) {
+  if (v == null) return "voltage-token voltage-missing";
+  if (kind === "solar") {
+    if (v < 0.10) return "voltage-token voltage-critical";
+    if (v < 0.30) return "voltage-token voltage-low";
+    if (v < 0.80) return "voltage-token voltage-ok";
+    return "voltage-token voltage-high";
+  }
+  if (v < 3.50) return "voltage-token voltage-critical";
+  if (v < 3.80) return "voltage-token voltage-low";
+  if (v < 4.80) return "voltage-token voltage-ok";
+  return "voltage-token voltage-high";
+}
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+function pct(a, p) {
+  if (!a.length) return null;
+  const s = [...a].sort((x,y) => x-y);
+  const idx = Math.min(s.length-1, Math.floor((p/100) * s.length));
+  return s[idx];
+}
+function histogram(vals, n) {
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const w = (mx - mn) / n || 1;
+  const edges = Array.from({length: n+1}, (_, i) => mn + i*w);
+  const counts = new Array(n).fill(0);
+  for (const v of vals) {
+    const i = Math.min(n-1, Math.floor((v - mn) / w));
+    counts[i]++;
+  }
+  const labels = edges.slice(0, n).map((e,i) => `${e.toFixed(2)}–${edges[i+1].toFixed(2)}`);
+  return { edges, counts, labels };
+}
+function histogramInto(vals, edges) {
+  const n = edges.length - 1;
+  const counts = new Array(n).fill(0);
+  for (const v of vals) {
+    let i = 0;
+    while (i < n && v >= edges[i+1]) i++;
+    counts[Math.min(n-1, i)]++;
+  }
+  return counts;
+}
+// ---- TZ / date helpers ----
+function tzOffsetMsAt(tz, utcMs) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(new Date(utcMs));
+  const g = t => +parts.find(p => p.type === t).value;
+  const asIfUtc = Date.UTC(g("year"), g("month")-1, g("day"), g("hour"), g("minute"), g("second"));
+  return asIfUtc - utcMs; // positive if tz is ahead of UTC
+}
+function parseDateInputToUtc(elId, tz, isEnd) {
+  const v = document.getElementById(elId).value;
+  if (!v) return null;
+  const [y, m, d] = v.split("-").map(Number);
+  const hh = isEnd ? 23 : 0, mm = isEnd ? 59 : 0, ss = isEnd ? 59 : 0, ms = isEnd ? 999 : 0;
+  const guess = Date.UTC(y, m-1, d, hh, mm, ss, ms);
+  return new Date(guess - tzOffsetMsAt(tz, guess));
+}
+function setDateInputFromUtc(elId, utcDate, tz) {
+  if (!utcDate) { document.getElementById(elId).value = ""; return; }
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(utcDate);
+  const g = t => parts.find(p => p.type === t).value;
+  document.getElementById(elId).value = `${g("year")}-${g("month")}-${g("day")}`;
+}
+function fmtDateTz(utc, tz = state.tz, withSec = false) {
+  if (!utc || !(utc instanceof Date) || isNaN(utc)) return "—";
+  const opts = { timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false };
+  if (withSec) opts.second = "2-digit";
+  // en-GB gives "22/04/2026, 21:07" → normalise to "2026-04-22 21:07"
+  const parts = new Intl.DateTimeFormat("en-GB", opts).formatToParts(utc);
+  const g = t => parts.find(p => p.type === t)?.value ?? "";
+  let s = `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")}`;
+  if (withSec) s += `:${g("second")}`;
+  return s;
+}
+function fmtDate(d) { return fmtDateTz(d, state.tz, false); }
+function fmt(v, n) { return v == null || !Number.isFinite(v) ? "—" : v.toFixed(n); }
+function fmtDuration(ms) {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  const min = ms / 60000;
+  if (min < 1) return `${(ms/1000).toFixed(0)} s`;
+  if (min < 60) return `${min.toFixed(1)} min`;
+  const hr = min / 60;
+  if (hr < 24) return `${hr.toFixed(1)} h`;
+  return `${(hr/24).toFixed(1)} d`;
+}
+function dayKeyTz(d, tz) {
+  if (!d) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const g = t => parts.find(p => p.type === t).value;
+  return `${g("year")}-${g("month")}-${g("day")}`;
+}
+
+// Chart.js global defaults
+Chart.defaults.color = "#334155";
+Chart.defaults.borderColor = "#e2e8f0";
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto";
+loadDefaultWorkbook();
+</script>
+</body>
+</html>
