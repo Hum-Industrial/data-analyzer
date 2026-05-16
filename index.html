@@ -1074,8 +1074,7 @@ function handleFile(e) {
 function loadWorkbookData(data, type, fileName) {
   const wb = XLSX.read(data, { type });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  // range:1 skips the blank row 1; row 2 becomes the header.
-  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, range: 1 });
+  const matrix = normalizeInputMatrix(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }));
   if (!matrix || matrix.length < 2) throw new Error("No data rows found");
   ingest(matrix);
   document.getElementById("fileName").textContent = fileName;
@@ -1110,6 +1109,52 @@ function loadArrayBuffer(url) {
     xhr.onerror = () => reject(new Error("Network error"));
     xhr.send();
   });
+}
+
+function headerKey(v) {
+  return String(v ?? "").trim().replace(/^'+/, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function buildHeaderMap() {
+  const map = new Map(COLS.map(c => [headerKey(c), c]));
+  const aliases = {
+    valvetype: "ValveData_type",
+    valvesensorid: "ValveData_sensor_id",
+    valveepochseconds: "ValveData_epoch_seconds",
+    valvebatteryvoltagecentivolts: "ValveData_battery_voltage_centivolts",
+    valvestatus: "ValveData_status",
+    valvehallsense: "ValveData_hall_sense",
+    valverawmag: "ValveData_raw_mag",
+  };
+  for (const [k, v] of Object.entries(aliases)) map.set(k, v);
+  return map;
+}
+
+function normalizeInputMatrix(matrix) {
+  const headerMap = buildHeaderMap();
+  const headerIndex = matrix.findIndex(row => {
+    const keys = new Set((row || []).map(headerKey));
+    return keys.has("gatewayid") && keys.has("epochseconds") && keys.has("gatewaystate");
+  });
+  if (headerIndex < 0) {
+    // Last-resort fallback for already-normalized arrays.
+    return matrix.filter(row => row && row.some(v => v != null && v !== ""));
+  }
+
+  const headers = matrix[headerIndex] || [];
+  const indexByCol = new Map();
+  headers.forEach((h, i) => {
+    const col = headerMap.get(headerKey(h));
+    if (col && !indexByCol.has(col)) indexByCol.set(col, i);
+  });
+
+  const normalizedRows = matrix.slice(headerIndex + 1)
+    .filter(row => row && row.some(v => v != null && v !== ""))
+    .map(row => COLS.map(col => {
+      const idx = indexByCol.get(col);
+      return idx == null ? null : (row[idx] ?? null);
+    }));
+  return [COLS, ...normalizedRows];
 }
 
 // ---------- Ingest ----------
