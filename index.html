@@ -368,6 +368,26 @@
   .map-tooltip .k { color: var(--ink-dim); white-space: nowrap; }
   .map-tooltip .v { word-break: break-word; }
   .leaflet-container { background: #e5e7eb; }
+  .readme-screen { max-width: 980px; margin: 28px auto 0; }
+  .readme-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px 24px; }
+  .readme-panel h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: .1px; }
+  .readme-panel h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .readme-panel p { margin: 0; color: var(--ink-dim); line-height: 1.5; }
+  .readme-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+    margin-top: 18px; }
+  .readme-step { border-top: 1px solid var(--line); padding-top: 12px; }
+  .readme-notes { margin: 18px 0 0; padding: 14px 0 0 18px; border-top: 1px solid var(--line);
+    color: var(--ink-dim); line-height: 1.5; }
+  .readme-notes li { margin: 6px 0; }
+  .readme-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+  .readme-actions .btn { background: var(--accent); border-color: var(--accent); color: #fff;
+    font-weight: 600; }
+  .readme-actions .btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  @media (max-width: 760px) {
+    .readme-grid { grid-template-columns: 1fr; }
+    .readme-panel { padding: 18px; }
+  }
   .hidden { display: none !important; }
   .muted { color: var(--ink-dim); }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px;
@@ -430,9 +450,48 @@
 </header>
 
 <main>
-  <div id="hint" class="hint">
+  <div id="readmeScreen" class="readme-screen">
+    <section class="readme-panel" aria-labelledby="readmeTitle">
+      <h2 id="readmeTitle">How to use this app</h2>
+      <p>
+        This tool turns a gateway report into a browser-based health review for gateway,
+        boomerang, wagon, GPS, RSSI, connectivity, and daily timeline metrics.
+      </p>
+
+      <div class="readme-grid">
+        <div class="readme-step">
+          <h3>1. Upload the report</h3>
+          <p>Use <b>Upload .xlsx / .csv</b>. Cleaned workbooks and original gateway exports are both supported.</p>
+        </div>
+        <div class="readme-step">
+          <h3>2. Set the review window</h3>
+          <p>Adjust the date range and timezone after upload. Counts and charts update from the selected window.</p>
+        </div>
+        <div class="readme-step">
+          <h3>3. Assign boomerangs</h3>
+          <p>Use the Wagon tab to map boomerang IDs to wagon positions. Unmapped IDs appear as unassigned.</p>
+        </div>
+        <div class="readme-step">
+          <h3>4. Review each section</h3>
+          <p>Use Overview for the summary, Gateway for voltage/RSSI trends, Map/GPS for location quality, Connectivity for RSSI and tower data, and Timeline for daily details.</p>
+        </div>
+      </div>
+
+      <ul class="readme-notes">
+        <li>No spreadsheet data is bundled with this app.</li>
+        <li>The app runs in your browser; this page does not upload the report to a server.</li>
+        <li>Expandable rows show underlying readings where the summary tables group values.</li>
+      </ul>
+
+      <div class="readme-actions">
+        <button id="readmeOkBtn" class="btn" type="button">I understand</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="hint" class="hint hidden">
     <p><b>Upload a gateway report (.xlsx or .csv)</b> to analyze it.<br/>
-    Expected schema: row 1 blank, row 2 header, 68 columns beginning with <code>gateway_id</code>.</p>
+    The parser finds the <code>gateway_id</code> header automatically, including original exports with report/title rows before the data.</p>
     <p class="muted" style="font-size:12px">Everything runs in your browser — no data is uploaded to a server.</p>
   </div>
 
@@ -863,6 +922,14 @@ function updateDropdownCounts() {
 }
 
 // ---------- Entry ----------
+document.getElementById("readmeOkBtn").addEventListener("click", () => {
+  document.getElementById("readmeScreen").classList.add("hidden");
+  if (state.rows.length) {
+    document.getElementById("app").classList.remove("hidden");
+  } else {
+    document.getElementById("hint").classList.remove("hidden");
+  }
+});
 document.getElementById("fileInput").addEventListener("change", handleFile);
 document.getElementById("resetBtn").addEventListener("click", () => {
   state.filter.selectedStates = new Set(STATE_LABELS);
@@ -1061,6 +1128,7 @@ function loadWorkbookData(data, type, fileName) {
   if (!matrix || matrix.length < 2) throw new Error("No data rows found");
   ingest(matrix);
   document.getElementById("fileName").textContent = fileName;
+  document.getElementById("readmeScreen").classList.add("hidden");
   document.getElementById("hint").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   if (!location.hash) location.hash = "#/overview";
